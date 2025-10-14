@@ -274,7 +274,7 @@ def obtain_initial_comparison_star_list(logger, cmd_args, obs_night, ac_id,
             logger.info(f'Night {obs_night}  Action {ac_id}: Using {np.sum(comp_mask)} user defined comparison stars.')
             logger.info(f'Night {obs_night}  Action {ac_id}: Using these comparison stars (tics): {cmd_args.comp_tics}')
         else:
-            logger.info('ERROR - If user defined comp stars (--force_comp_stars) I need comparison star IDs (--comp_inds) or TIC IDs (--comp_tics).')
+            logger.error('If user defined comp stars (--force_comp_stars) I need comparison star IDs (--comp_inds) or TIC IDs (--comp_tics).')
             raise ValueError('If user defined comp stars (--force_comp_stars) I need comparison star IDs (--comp_inds) or TIC IDs (--comp_tics).')        
     
     else:

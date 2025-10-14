@@ -71,15 +71,16 @@ if __name__ == "__main__":
     bsdir = args.output
     ngpipe_op_dir = '/ngts/PAOPhot2/'
     observation_nights = args.night
-    #  This function checks the bsdir area for an existing output directory structure
-    #  If the structure does not exist then BSP creates the relevant directory structure
-    outdir_main, individual_night_outdirs = bspd.check_output_directories(
-            bsdir, observation_nights, object_name)
-    
+
     # Initialise overall logger
     #  This logger stores info about the actions/nights included in each run of BSP for a given object
     logger_main = bspu.set_up_overall_logger(
         object_name, outdir_main+'master_logs/'+object_name+'_bsproc_main.log')
+
+    #  This function checks the bsdir area for an existing output directory structure
+    #  If the structure does not exist then BSP creates the relevant directory structure
+    outdir_main, individual_night_outdirs = bspd.check_output_directories(
+            logger_main, bsdir, observation_nights, object_name)
     
     # Find the relevant action IDs from the SQL databases
     #  This function uses the object name and observation nights to search for 

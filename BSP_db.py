@@ -60,13 +60,15 @@ def get_target_catalogue_from_database(tic_id):
     tmags   = np.array([i[3] for i in output])
     return tic_ids, idx, mask, tmags
 
-def check_output_directories(bs_root_dir, obs_nights, obj_name):
+def check_output_directories(logger_main, bs_root_dir, obs_nights, obj_name):
     """
     Function to ensure the correct output directories exist
     If the relevant directories do not exist then they will be generated
     
     Parameters
     ----------
+    logger : logger
+        Logger which governs the main log file for the overall BSP run
     bs_root_dir : str
         Path to the root directory for the BSP outputs for all objects
     obs_nights : list; str
@@ -106,6 +108,7 @@ def check_output_directories(bs_root_dir, obs_nights, obj_name):
     if not os.path.exists(objdir+'action_summaries/'):
         os.system('mkdir '+objdir+'action_summaries/')
     if obs_nights is None:
+        logger_main.error("No observation nights supplied.")
         raise ValueError('I need night(s) for the observations. (--night <YYYY-MM-DD>)')
     
     # Create a sub-directory within the BSP outputs directory for each observation night
@@ -113,15 +116,20 @@ def check_output_directories(bs_root_dir, obs_nights, obj_name):
     for night in obs_nights:
         ymd = night.split('-')
         if not len(ymd) == 3:
+            logger_main.error('Observation night provided in wrong format. Must be YYYY-MM-DD')
             raise ValueError('Night in wrong format. Must be YYYY-MM-DD')
         y, m, d = ymd[0], ymd[1], ymd[2]
         if not len(y) == 4:
+            logger_main.error('Observation night provided in wrong format. Must be YYYY-MM-DD')
             raise ValueError('Night in wrong format. Must be YYYY-MM-DD')
         if not len(m) == 2:
+            logger_main.error('Observation night provided in wrong format. Must be YYYY-MM-DD')
             raise ValueError('Night in wrong format. Must be YYYY-MM-DD')
         if not len(d) == 2:
+            logger_main.error('Observation night provided in wrong format. Must be YYYY-MM-DD')
             raise ValueError('Night in wrong format. Must be YYYY-MM-DD')
         if int(m) > 12.5:
+            logger_main.error('Observation night provided in wrong format. Must be YYYY-MM-DD')
             raise ValueError('Night in wrong format. Must be YYYY-MM-DD')
         outdir = outdir_main+night+'/'
         if not os.path.exists(outdir):
@@ -192,6 +200,7 @@ def find_action_ids(logger_main, cmd_args, obj_name, obs_nights, ind_night_outdi
     elif obj_name == 'WASP-47' or obj_name == 'WASP47':
         camp_id = 'WASP47'
     else:
+        logger_main.error("No campaign name can be determined for Object Name : "+obj_name)
         raise ValueError("No campaign name can be determined for Object Name :  "+obj_name+". Please check your inputs.")
     for night, ind_night_outdir in zip(obs_nights, ind_night_outdirs):  
         # SQL queries to identify actions associated with the campaign name for 
@@ -251,14 +260,18 @@ def find_action_ids(logger_main, cmd_args, obj_name, obs_nights, ind_night_outdi
                         for r in res3:
                             logger_main.info(f'{r}')
                     if len(res2) < 0.5 and len(res3) < 0.5:
+                        logger_main.error('Found no actions for '+obj_name+' or on '+night)
                         raise ValueError('Found no actions for '+obj_name+' or on '+night+'. Check your inputs.')
                         
                     elif len(res2) > 0.5 and len(res3) < 0.5:
+                        logger_main.error('Found no actions at all for '+obj_name+' but found actions for other objects on '+night)
                         raise ValueError('Found no actions at all for '+obj_name+' but found actions for other objects on '+night+'. Check your inputs.')
                     
                     elif len(res2) < 0.5 and len(res3) > 0.5:
+                        logger_main.error('Found actions for '+obj_name+' on other nights but none on '+night)
                         raise ValueError('Found actions for '+obj_name+' on other nights but none on '+night+'. Check your inputs.')
                     else:
+                        logger_main.error('Found actions for '+obj_name+' on other nights and actions for other objects on '+night)
                         raise ValueError('Found actions for '+obj_name+' on other nights and actions for other objects on '+night+'. Check your inputs.')
 
         # If we find actions for the object on the provided night we add these to the overall BSP run log file
@@ -328,7 +341,7 @@ def get_target_tic_id(logger_main, obj_name):
             cur.execute(qry)
             res = cur.fetchone()
             if len(res) < 0.5:
-                logger_main.info('ERROR - no TIC ID found in DB for '+obj_name)
+                logger_main.error('No TIC ID found in DB for '+obj_name)
                 raise ValueError('Couldn\'t find a TIC ID for '+obj_name+'.')
             else:
                 tic = int(res[0])
@@ -347,7 +360,7 @@ def get_target_tic_id(logger_main, obj_name):
         tic = 102264230
         logger_main.info(f'Object is TIC-{tic}')
     if tic is None:
-        logger_main.info('ERROR - no TIC ID found for '+obj_name+'. Quitting.')
+        logger_main.error('No TIC ID found for '+obj_name+'. Quitting.')
         raise ValueError('No TIC ID found for '+obj_name+'. Quitting.')
     
     return logger_main, tic
@@ -408,7 +421,7 @@ def query_target_catalogues(logger, obj_tic, phot_file_dir, ac_id):
         if tic_ids is None:
             # If no target catalogue information can be found BSP exits gracefully
             # Solution here is to ensure the ngpipe photometry reduction has completed for the observations
-            logger.info('ERROR - Couldn\'t find any target catalogue information for TIC '+str(obj_tic))
+            logger.error('Couldn\'t find any target catalogue information for TIC '+str(obj_tic))
             raise ValueError('Couldn\'t find any target catalogue information for TIC '+str(obj_tic))
         tmag_target = tmags_full[0]
         tmags_comps = tmags_full[idx==2]
