@@ -1,0 +1,10 @@
+pymysql
+astropy
+numpy
+emcee
+matplotlib
+corner
+batman-package
+pandas
+tqdm
+scipy
