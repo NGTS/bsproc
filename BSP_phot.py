@@ -169,7 +169,14 @@ def find_bad_comp_stars(logger, comp_fluxes, airmass, comp_mags0,
         cut = np.isnan(std_medians)
         mag_nodes = mag_nodes[~cut]
         std_medians = std_medians[~cut]
+        
+        if len(mag_nodes) <= 3:
+            logger.error(f"The spline fit used to identify bad comparison stars has too widely spaced nodes")
+            logger.error(f"Input value is dmag = {dmag:.2f} - try a lower value")
+            raise ValueError(f"Spline fit node spacing is too large (dmag = {dmag:.2f})")
+        
         spl = ius(mag_nodes, std_medians)
+        exit()
         mod = spl(comp_mags)
         mod0 = spl(comp_mags0)
         std = np.std(comp_rms - mod)
