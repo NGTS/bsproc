@@ -176,7 +176,6 @@ def find_bad_comp_stars(logger, comp_fluxes, airmass, comp_mags0,
             raise ValueError(f"Spline fit node spacing is too large (dmag = {dmag:.2f})")
         
         spl = ius(mag_nodes, std_medians)
-        exit()
         mod = spl(comp_mags)
         mod0 = spl(comp_mags0)
         std = np.std(comp_rms - mod)

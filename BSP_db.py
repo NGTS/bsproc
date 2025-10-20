@@ -13,6 +13,7 @@ import pymysql.cursors
 import astropy.io.fits as pyfits
 import numpy as np
 import os
+from pathlib import Path
 
 def get_target_catalogue_from_database(tic_id):
     """
@@ -60,7 +61,28 @@ def get_target_catalogue_from_database(tic_id):
     tmags   = np.array([i[3] for i in output])
     return tic_ids, idx, mask, tmags
 
-def check_output_directories(logger_main, bs_root_dir, obs_nights, obj_name):
+
+def create_output_directory_tree(bs_root_dir, obj_name):
+    """
+    Create main directory tree for saving reduction outputs
+    """
+    # Check for whether BSP output root directory exists
+    Path(bs_root_dir).mkdir(parents=True, exist_ok=True)
+
+    # Check whether the BSP output directory exists for the object
+    objdir = bs_root_dir + '/' + obj_name + '/'
+    Path(objdir).mkdir(parents=True, exist_ok=True) 
+    
+    outdir_main = objdir + 'analyse_outputs/'
+    sumdir_main = objdir + 'action_summaries/'
+    logdir_main = outdir_main + 'master_logs/'
+    Path(outdir_main).mkdir(parents=True, exist_ok=True) 
+    Path(sumdir_main).mkdir(parents=True, exist_ok=True) 
+    Path(logdir_main).mkdir(parents=True, exist_ok=True) 
+    return outdir_main
+
+
+def check_output_directories(logger_main, outdir_main, obs_nights):
     """
     Function to ensure the correct output directories exist
     If the relevant directories do not exist then they will be generated
@@ -69,17 +91,13 @@ def check_output_directories(logger_main, bs_root_dir, obs_nights, obj_name):
     ----------
     logger : logger
         Logger which governs the main log file for the overall BSP run
-    bs_root_dir : str
-        Path to the root directory for the BSP outputs for all objects
+    outdir_main : str
+        Path to the specific root directory for BSP pipeline outputs for this object
     obs_nights : list; str
         NGTS observation nights considered in the BSP pipeline run
-    obj_name : str
-        Name of the target star
 
     Returns
     -------
-    outdir_main : str
-        Path to the specific root directory for BSP pipeline outputs for this object
     ind_night_outdirs : list; str
         Paths to directories for the BSP outputs for each observation night considered
             in this BSP pipeline run
@@ -91,22 +109,7 @@ def check_output_directories(logger_main, bs_root_dir, obs_nights, obj_name):
             in an incorrect format
         
     """
-    # Check for whether BSP output root directory exists
-    # If it does not, create the directory
-    if not os.path.exists(bs_root_dir):
-        os.system('mkdir '+bs_root_dir)
-    # Check whether the BSP output directory exists for the object
-    # If not, create the directory with correct structure
-    objdir = bs_root_dir+'/'+obj_name+'/'
-    if not os.path.exists(objdir):
-        os.system('mkdir '+objdir)
-    outdir_main = objdir+'analyse_outputs/'
-    
-    if not os.path.exists(outdir_main):
-        os.system('mkdir '+outdir_main)
-        os.system('mkdir '+outdir_main+'master_logs/')
-    if not os.path.exists(objdir+'action_summaries/'):
-        os.system('mkdir '+objdir+'action_summaries/')
+
     if obs_nights is None:
         logger_main.error("No observation nights supplied.")
         raise ValueError('I need night(s) for the observations. (--night <YYYY-MM-DD>)')
@@ -131,7 +134,8 @@ def check_output_directories(logger_main, bs_root_dir, obs_nights, obj_name):
         if int(m) > 12.5:
             logger_main.error('Observation night provided in wrong format. Must be YYYY-MM-DD')
             raise ValueError('Night in wrong format. Must be YYYY-MM-DD')
-        outdir = outdir_main+night+'/'
+       
+        outdir = outdir_main + night + '/'
         if not os.path.exists(outdir):
             os.system('mkdir '+outdir)
             os.system('mkdir '+outdir+'comp_star_check_plots/')
@@ -140,7 +144,7 @@ def check_output_directories(logger_main, bs_root_dir, obs_nights, obj_name):
             os.system('mkdir '+outdir+'logs/')
         ind_night_outdirs.append(outdir)
             
-    return outdir_main, ind_night_outdirs
+    return ind_night_outdirs
 
 def find_action_ids(logger_main, cmd_args, obj_name, obs_nights, ind_night_outdirs):
     """
