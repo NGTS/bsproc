@@ -895,9 +895,11 @@ def run_BSP_process_single_action(logger_main, cmd_args, object_name, ngpipe_op_
             comp_star_rms_good = find_comp_star_rms(comp_fluxes_good0, airmass, comp_tmags_good0)
             
             # Various diagnostic comparison star plots are produced by this function
+            comp_star_mask = np.array([True] * len(comp_tmags_good0))
             make_comp_star_plots(comp_tmags_good0, comp_star_rms_good,
                                  comp_inds_good0, comp_tics_good0,
-                                 comp_bjd_vals_good0, comp_fluxes_good0, airmass,
+                                 comp_bjd_vals_good0, comp_fluxes_good0,
+                                 comp_star_mask, airmass,
                                  outdir, object_name, ns, ac, r)
             
         else:
