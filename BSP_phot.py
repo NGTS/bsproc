@@ -822,9 +822,11 @@ def run_BSP_process_single_action(logger_main, cmd_args, object_name, ngpipe_op_
     # Ensure we have the correct DataFrame to save the data to
     df_full_dir = outdir+'data_files/'
     phot_csv_file = df_full_dir+f'action{ac}_bsproc_dat.csv'
-    if cmd_args.force_new_csv:
+    if cmd_args.force_new_csv or cmd_args.ignore_bjd is not None:
         # If this flag is provided on the command line then we create a new output file
         #   and overwrite any existing phot files
+        if cmd_args.ignore_bjd is not None:
+            logger.info("Force creating new phot file since some BJD were ignored")
         logger.info('Creating new phot file: '+phot_csv_file)
         logger.info('Overwriting the exisiting phot file.')
         df = pd.DataFrame(np.column_stack((target_bjd_vals, airmass,
