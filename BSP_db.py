@@ -8,11 +8,14 @@ for BSP pipeline runs
 
 @author: Edward M. Bryant
 """
+import re
+import os
+import requests
 import pymysql
 import pymysql.cursors
-import astropy.io.fits as pyfits
 import numpy as np
-import os
+import pandas as pd
+import astropy.io.fits as pyfits
 from pathlib import Path
 
 def get_target_catalogue_from_database(tic_id):
@@ -145,6 +148,243 @@ def check_output_directories(logger_main, outdir_main, obs_nights):
         ind_night_outdirs.append(outdir)
             
     return ind_night_outdirs
+
+def get_simbad_object_identifiers(gaia_id):
+  """
+  Fetch WASP, HIP, HD, HR, and NGTS identifiers from Simbad using Gaia DR2 ID.
+  API documentation: https://simbad.cds.unistra.fr/guide/sim-url.htx
+  """
+  
+  qry = "SELECT id2.id FROM ident AS id1 JOIN ident AS id2 USING(oidref) "
+  qry += "WHERE id1.id = 'Gaia DR2 {}';".format(int(gaia_id))
+  
+  url = "https://simbad.cds.unistra.fr/simbad/sim-tap/sync?"
+  url += "request=doQuery&lang=adql&format=text&query={}".format(qry)
+
+  response = requests.get(url)
+  if response.status_code != 200:
+    return None
+  
+  designations = [ r.strip().replace('\"','') for r in response.text.split('\n')[2:] ]
+  designations = [ r for r in designations if len(r) > 0 ]
+  if len(designations) == 0:
+    return None  
+
+  # Fetch all other designations from Simbad
+  # designations = Simbad.query_objectids('Gaia DR2 {:}'.format(gaia_id))
+  # if designations is None:
+  #  return None
+  
+  objids = {}
+  # for name in designations['ID']:
+  for name in designations:
+    if name.startswith('WASP'):
+      objids['WASP'] = int(re.findall(r'\d+', name)[0])
+      continue
+    elif name.startswith('HIP'):
+      objids['HIP'] = int(re.findall(r'\d+', name)[0])
+      continue
+    elif name.startswith('HD'):
+      objids['HD'] = int(re.findall(r'\d+', name)[0])
+      continue
+    elif name.startswith('HR'):
+      objids['HR'] = int(re.findall(r'\d+', name)[0])
+      continue
+    elif name.startswith('NGTS'):
+      objids['NGTS'] = int(re.findall(r'\d+', name)[0])
+
+  return objids
+
+
+def generate_objids_regexp(objids):
+  """ Creates Regexp expression that matches any of the input star designations, accounting for:
+    - Upper/lower case catalog (.e. WASP/wasp)
+    - Dash, underscore, whitespace, or nothing joining catalog name with ID (.e.g WASP-123, WASP123, WASP_123, WASP 123 )
+    - Any leading zeros in ID (e.g. TOI-123, TOI-0123, TOI-00123, etc)
+    - Star designation followed by any text after a dash or underscore (e.g. TOI-123-801, TOI-123_801)
+  """
+  d = objids.copy()
+  # Consider that 'O' in a catalog name can also be a '0'
+  d.update({ k.replace('O','0') : v for k,v in d.items() if 'O' in k })
+  regexp_items = ["({kl}|{ku})[-_\s]?0*{v}([_-].*)?$".format(kl=k.lower(), ku=k.upper(), v=v) for k,v in d.items()]
+  regexp = '^(' + '|'.join(regexp_items) + ')'
+  return regexp
+
+
+def get_configured_fields_from_nickname(
+    objids :dict,
+    conn   :pymysql.Connection
+  ) -> pd.DataFrame:
+  
+  regexp = generate_objids_regexp(objids)
+  qry ="""
+    SELECT
+      master_field_list.nickname           AS nickname,
+      master_field_list.field              AS field,
+      scheduler_field_info.project         AS project,
+      scheduler_field_info.priority        AS priority,
+      scheduler_field_info.defocus         AS defocus,
+      field_camera_map.camera_id           AS camera_id,
+      active_fields.enabled            AS enabled,
+      IF(scheduler_field_info.field IS NULL, 0, 1) AS configured,
+      IF(active_fields.enabled IS NULL, 0, 1)    AS activated
+    FROM master_field_list
+      LEFT JOIN scheduler_field_info USING(field)
+      LEFT JOIN field_camera_map   USING(field)
+      LEFT JOIN active_fields    USING(field)
+    WHERE master_field_list.nickname REGEXP "{}"
+    ORDER BY camera_id;
+  """.format(regexp)
+
+  with conn.cursor() as cur:
+    result = cur.execute(qry)
+  if result is None or len(result) == 0:
+    return None
+  return pd.DataFrame(result)
+
+
+def fetch_tic8_data(tic = None, toi = None):
+  """
+  Fetch information about a TIC star from TICv8 using either its TIC or TOI ID.
+  
+  Parameters
+  ----------
+  tic     :int (optional), TIC ID
+  toi     :int (optional), TOI ID
+
+  Returns
+  -------
+  result : dict with keys,
+    tic     :int, TIC ID
+    toi     :int, TOI ID
+    hip     :int, HIP ID (if available, otherwise None)
+    gaia    :int, Gaia DR2 ID
+    ra_deg  :float, Right Ascension in degrees
+    dec_deg :float, Declination in degrees
+    Vmag    :float, V-band magnitude
+  """
+  # FLOOR toi ID because it is stored as a Decimal in the tess.tois table,
+  # with the fractional part representing the planet candidate,
+  # but we only want info on the star.
+  if tic is not None:
+    target_id = int(tic)
+    qry = """
+      SELECT
+        tic_id, FLOOR(toi_id) as toi_id, hip_id, gaia_id, ra_deg, dec_deg, Vmag, tic8.Tmag
+      FROM catalogues.tic8 AS tic8
+      LEFT JOIN tess.tois USING(tic_id)
+      WHERE tic_id = %s LIMIT 1
+    """
+  elif toi is not None:
+    target_id = int(toi)
+    qry = """
+      SELECT
+        tic_id, FLOOR(toi_id) as toi_id, hip_id, gaia_id, ra_deg, dec_deg, Vmag, tic8.Tmag
+      FROM tess.tois
+      LEFT JOIN catalogues.tic8 AS tic8 USING(tic_id)
+      WHERE FLOOR(toi_id) = %s LIMIT 1
+    """
+  else:
+    # Must define either ID
+    return None
+
+  with pymysql.connect(host='10.2.4.244', user='pipe',
+      cursorclass=pymysql.cursors.DictCursor) as conn:
+    conn.execute(qry, args = target_id)
+    result = conn.fetchone()
+  if result is None:
+    return None
+
+  data = {
+    'tic'    : int(result['tic_id' ]),
+    'toi'    : int(result['toi_id' ]) if result['toi_id']  is not None else None,
+    'gaia'   : int(result['gaia_id']) if result['gaia_id'] is not None else None,
+    'hip'    : int(result['hip_id' ]) if result['hip_id']  is not None else None,
+    'ra_deg' : float(result['ra_deg' ]),
+    'dec_deg': float(result['dec_deg']),
+    'Vmag'   : float(result['Vmag'   ]),
+    'Tmag'   : float(result['Tmag'   ])
+  }
+  return data
+
+
+def find_target_actions(tic_id = None, nights = None, camera = None, logger = None):
+
+  if tic_id is None and toi_id is None:
+    logger.error("Provide either TIC ID or TOI ID")
+    return None
+
+  # Find TOI and Gaia IDs
+  tic8_data = fetch_tic8_data(tic=tic_id)
+  if tic8_data is None:
+    logger.error("Invalid TIC or TOI ID")
+    return None
+
+  toi_id  = tic8_data['toi']
+  gaia_id = tic8_data['gaia']
+  objids = {'TIC': tic_id, 'TOI':toi_id, 'GaiaDR2':gaia_id} 
+ 
+  # Find additional designations
+  if gaia_id is not None:
+    logger.info("Fetching additional designations from Simbad...")
+    objids_simbad = get_simbad_object_identifiers(gaia_id)
+    if objids_simbad is None:
+      objids_simbad = {}
+    objids.update(objids_simbad)
+
+  logger.info(f"Object IDs: {objids}")
+
+  # Fetch fields and actions
+  regexp = generate_objids_regexp(objids)
+
+  conn = pymysql.connect(host='ngtsdb', db='ngts_ops', user='pipe',
+    cursorclass=pymysql.cursors.DictCursor)
+   
+  qry_args = []
+
+  camqry = ""
+  if camera is not None:
+    camqry = "AND camera_id = %s"
+    qry_args.append(camera)
+
+  niteqry = ""
+  if nights is not None:
+    pholders = ','.join(['%s'] * len(nights))
+    niteqry = f"AND night IN ({pholders})"
+    qry_args += list(nights)
+
+  qry = f"""
+    SELECT night, field, nickname, camera_id, action_id, num_images, status
+    FROM action_summary_log
+    LEFT JOIN master_field_list AS mfl USING(field)
+    WHERE mfl.nickname REGEXP "{regexp}"
+    AND (status = 'completed' OR (status = 'aborted' AND num_images >= 100))
+    {camqry} {niteqry}
+    ORDER BY night,camera_id 
+  """
+  print(qry) 
+  with conn.cursor() as cur:
+    cur.execute(qry, qry_args)
+    results = cur.fetchall()
+  
+  if results is None or len(results) == 0:
+    logger.error("No actions found!")
+    return None 
+
+  actions = pd.DataFrame(results)
+  logger.info(f"Found {len(results)} actions\n{actions}")
+
+  # Check nights 
+  actions['night'] = [ n.strftime('%Y-%m-%d') for n in actions['night'] ]
+
+  nights_found = set(actions['night'])
+  nights_missing = set(nights) - nights_found
+  if len(nights_missing) > 0:
+    logger.error(f"Could not find actions for {len(nights_missing)} nights: {nights_missing}")
+    return None
+ 
+  return actions
+
 
 def find_action_ids(logger_main, cmd_args, obj_name, obs_nights, ind_night_outdirs):
     """
