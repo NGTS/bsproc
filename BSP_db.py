@@ -288,7 +288,7 @@ def fetch_tic8_data(tic = None, toi = None):
     # Must define either ID
     return None
 
-  with pymysql.connect(host='10.2.4.244', user='pipe',
+  with pymysql.connect(host='ngtsdb', user='pipe',
       cursorclass=pymysql.cursors.DictCursor) as conn:
     conn.execute(qry, args = target_id)
     result = conn.fetchone()
