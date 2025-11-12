@@ -12,7 +12,7 @@ import argparse as ap
 import BSP_utils as bspu
 import BSP_db as bspd
 import BSP_phot as bspp
-
+import test_bsproc as tb
 def ParseArgs():
     """
     Function to handle parsing the command line arguments.
@@ -98,7 +98,10 @@ if __name__ == "__main__":
     #      SQL databases - if name in the style TOI-XXX
     #      HardCoded values for other names - ToDo: implement Sam's SIMBAD querying    
     logger_main, obj_ticid = bspd.get_target_tic_id(logger_main, object_name)
-    
+    print("---------------------------------------------------------")
+    print("The parmeters for this target in NASA exoplanet archive:")
+    print(tb.query_params_from_tic(obj_ticid))
+    print("---------------------------------------------------------")
     # This function call runs the main BSP process.
     # This process includes - 
     #     Finding the relevant fits file outputs from ngpipe for the actions
