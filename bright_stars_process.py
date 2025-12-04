@@ -8,11 +8,13 @@ Run the NGTS BSP pipeline
 @author: Edward M. Bryant
 """
 
+import numpy as np
 import argparse as ap
 import BSP_utils as bspu
 import BSP_db as bspd
 import BSP_phot as bspp
 from bmlc_nea import tranmodel
+
 def ParseArgs():
     """
     Function to handle parsing the command line arguments.
@@ -20,9 +22,9 @@ def ParseArgs():
     See each entry for information on each flag
     """
     parser = ap.ArgumentParser()
-    parser.add_argument('name', type=str, default=None,
-                        help='Object name to produce light curve(s) for. REQUIRED')
-    parser.add_argument('night', type=str, nargs='*', default=None,
+    parser.add_argument('tic_id', type=int,
+                        help='Object TIC ID for which to produce light curve(s) for. REQUIRED')
+    parser.add_argument('night', type=str, nargs='*',
                         help='Night(s) on which the observations were taken. Must be format YYYY-MM-DD. REQUIRED')
     parser.add_argument('--output', type=str, default='./bsproc_outputs/',
                         help='Name of directory to save the outputs in. Default is ./bsproc_outputs/')
@@ -60,11 +62,14 @@ def ParseArgs():
 
 if __name__ == "__main__":
     # Parse initial arguments
-    args = ParseArgs()
-    object_name = args.name
-    if object_name is None:
-        raise ValueError('I need an object name. (--name <object_name>) ')
-        
+    args = ParseArgs() 
+    
+    if len(args.night) == 0:
+      print("ERROR - provide observation nights")
+      exit(-1)
+    
+    object_name = f"TIC-{args.tic_id}"
+
     # Here we set up output directories
     #  bsdir is where the BSP outputs will be stored
     #  ngpipe_op_dir is the root directory for the ngpipe photometric outputs
@@ -89,19 +94,36 @@ if __name__ == "__main__":
     # Find the relevant action IDs from the SQL databases
     #  This function uses the object name and observation nights to search for 
     #     relevant action IDs with the SQL databases
-    logger_main, actions, night_store, individual_night_outdir_store = bspd.find_action_ids(
-            logger_main, args, object_name, observation_nights, individual_night_outdirs)
+    # logger_main, actions, night_store, individual_night_outdir_store = bspd.find_action_ids(
+    #         logger_main, args, object_name, observation_nights, individual_night_outdirs)
     
+    actionlist = bspd.find_target_actions(
+      tic_id = args.tic_id,
+      nights = observation_nights,
+      camera = args.camera,
+      logger = logger_main
+    )
+
+    if actionlist is None:
+      logger_main.error("Error fetching target actions")
+      exit(-1)
+
+    actions = actionlist['action_id'].to_numpy()
+    night_store = actionlist['night'].to_numpy()
+    night_outdir_dict = { n:d for n,d in zip(observation_nights, individual_night_outdirs) }
+    individual_night_outdir_store = np.array([ night_outdir_dict[n] for n in night_store ])
+     
     # Find the TIC ID for the target
     #  This function determines the target TIC ID from:
     #      ObjectName - if name in the style TIC-XXXX
     #      SQL databases - if name in the style TOI-XXX
     #      HardCoded values for other names - ToDo: implement Sam's SIMBAD querying    
-    logger_main, obj_ticid = bspd.get_target_tic_id(logger_main, object_name)
+    # logger_main, obj_ticid = bspd.get_target_tic_id(logger_main, object_name)
+    obj_ticid = args.tic_id
 
     # create a csv file including the batman model for the parameters queried from NASA Exoplanet Archive
     BMmodel = tranmodel(obj_ticid,observation_nights)
-    
+
     # This function call runs the main BSP process.
     # This process includes - 
     #     Finding the relevant fits file outputs from ngpipe for the actions

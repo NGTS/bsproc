@@ -777,7 +777,7 @@ def run_BSP_process_single_action(logger_main, cmd_args, object_name, ngpipe_op_
     # Query the target catalogue files for each field
     #  This function searches for the PHOTOMETRY_CATALOGUE.fits output file from ngpipe
     #  This file contains relevant information on the target and comparison stars
-    phot_file_root_dir = ngpipe_op_dir + f'bs_photometry/action{ac}/'
+    phot_file_root_dir = ngpipe_op_dir + f'photometry/action{ac}/'
     logger, tic_ids_full_cat, cat_idx_vals, comp_star_mask_ngpipe, \
         target_tmag_val, comps_tmag_vals = bspd.query_target_catalogues(
                 logger, target_tic_id, phot_file_root_dir, ac)
