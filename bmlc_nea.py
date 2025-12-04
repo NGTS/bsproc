@@ -121,8 +121,8 @@ def save_transit_csv(t, flux, tc, ticid, night):
     filename = f"{ticid}_{night}_model.csv"
     with open(filename, "w") as f:
         f.write(f"# TIC {ticid}, Night {night}\n")
-        f.write(f"# Transit midtime (tc) = {tc:.10f}\n")
-        f.write("t,flux\n")
+        f.write(f"# Transit midtime (Tc) = {tc:.10f}\n")
+        f.write("BJD,FLUX\n")
         for ti, fi in zip(t, flux):
             f.write(f"{ti},{fi}\n")
     print(f"[BMLC] Saved {filename}")
