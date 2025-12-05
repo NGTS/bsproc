@@ -305,6 +305,11 @@ def infer_transit_params(row):
         "method_stmass": method_Mstar
     }
 
+
+
+# -------------------QUERY----------------------
+
+# query all requisite parameters from pscomppars
 def query_params_from_pscomppars(ticid):
     url = "https://exoplanetarchive.ipac.caltech.edu/TAP/sync"
     qry = (
@@ -327,8 +332,7 @@ def query_params_from_pscomppars(ticid):
         print(f"Error querying pscomppars for TIC ID {ticid}: {e}")
         return None
 
-# QUERY______________________________________________________________________
-
+# query all parameters related and available in toi 
 def query_params_from_toi(ticid):
     # Query the TESS Object of Interest (TOI) table for a given TIC ID  
     """
@@ -363,9 +367,7 @@ def query_params_from_toi(ticid):
         print(f"Error querying TOI for TIC ID {ticid}: {e}")
         return None
 
-
-
-
+# query latest time parameters (TC , P) in ps table 
 def query_latest_time_from_ps(ticid):
     url = "https://exoplanetarchive.ipac.caltech.edu/TAP/sync"
     # order the result with rowupdate
@@ -375,7 +377,7 @@ def query_latest_time_from_ps(ticid):
         rowupdate, pl_pubdate, releasedate
     FROM ps
     WHERE tic_id LIKE '%{ticid}%'
-    ORDER BY rowupdate DESC, releasedate DESC, pl_pubdate DESC
+    ORDER BY  pl_pubdate DESC, rowupdate DESC, releasedate DESC
     """  
 
     try:
@@ -383,24 +385,23 @@ def query_latest_time_from_ps(ticid):
         r.raise_for_status()
         df = pd.read_csv(io.BytesIO(r.content))
 
-        if len(df) == 0:
+        if df.empty:
             print(f"No entry in ps table for TIC {ticid}")
             return None
-
-        for i, row in df.iterrows():
-            per, t0 = row["pl_orbper"], row["pl_tranmid"]
-
-            if not pd.isna(per) and not pd.isna(t0):
-                return row  
         
-        print("No tranmid and orbper satisfied.")
-        return None
+    # find the latest set of valid values of time terms
+        valid = df.dropna(subset=["pl_orbper","pl_tranmid"])
+        if valid.empty:
+            print("No tranmid and orbper satisfied")
+
+        return valid.iloc[0]
 
     except Exception as e:
         print(f"Error when querying ps: {e}")
-        return None
-    
+        return None    
 
+
+# Combine the pscomppars and ps tables: replace P, tc in pscomppars
 def get_best_params(ticid):
     # 1. pscomppars 
     df_comp = query_params_from_pscomppars(ticid)
@@ -414,36 +415,29 @@ def get_best_params(ticid):
     if result is not None:
         latest_ps = result
 
-        # make sure orbper tranmid =True
-        ps_orbper = latest_ps.get("pl_orbper", None)
-        ps_t0     = latest_ps.get("pl_tranmid", None)
-
         # replace pscomppars time items with ps ones
-        if not pd.isna(ps_orbper) and comp["pl_orbper"] != ps_orbper:
-            comp["pl_orbper"] = ps_orbper
+        if not pd.isna(latest_ps["pl_orbper"]) and comp["pl_orbper"] != latest_ps["pl_orbper"]:
+            comp["pl_orbper"] = latest_ps["pl_orbper"]
 
-        if not pd.isna(ps_t0) and comp["pl_tranmid"] != ps_t0:
-            comp["pl_tranmid"] = ps_t0
+        if not pd.isna(latest_ps["pl_tranmid"]) and comp["pl_tranmid"] != latest_ps["pl_tranmid"]:
+            comp["pl_tranmid"] = latest_ps["pl_tranmid"]
 
-    else:
-        pass
+    return comp
 
     # organise the structure of the output
-    final = comp[[
-        "pl_name", "hostname", "tic_id", 
-        "pl_orbper", "pl_tranmid", "pl_ratror", "pl_ratdor",
-        "pl_imppar", "pl_rade", "st_rad", "st_mass"
-    ]].to_frame().T
+    #final = comp[[
+    #   "pl_name", "hostname", "tic_id", 
+    #    "pl_orbper", "pl_tranmid", "pl_ratror", "pl_ratdor",
+    #    "pl_imppar", "pl_rade", "st_rad", "st_mass"
+    #   ]].to_frame().T
 
-    return final
-
+    #return final
 
 def infer_params_for_df(df):
     results = []
     for _, row in df.iterrows():
         results.append(infer_transit_params(row))
     return pd.DataFrame(results)
-
 
 
 def query_params_NEA(ticid):
