@@ -422,16 +422,14 @@ def get_best_params(ticid):
         if not pd.isna(latest_ps["pl_tranmid"]) and comp["pl_tranmid"] != latest_ps["pl_tranmid"]:
             comp["pl_tranmid"] = latest_ps["pl_tranmid"]
 
-    return comp
-
     # organise the structure of the output
-    #final = comp[[
-    #   "pl_name", "hostname", "tic_id", 
-    #    "pl_orbper", "pl_tranmid", "pl_ratror", "pl_ratdor",
-    #    "pl_imppar", "pl_rade", "st_rad", "st_mass"
-    #   ]].to_frame().T
+    final = comp[[
+       "pl_name", "hostname", "tic_id", 
+        "pl_orbper", "pl_tranmid", "pl_ratror", "pl_ratdor",
+        "pl_imppar", "pl_rade", "st_rad", "st_mass"
+       ]].to_frame().T
 
-    #return final
+    return final
 
 def infer_params_for_df(df):
     results = []
@@ -449,7 +447,7 @@ def query_params_NEA(ticid):
     Prints formatted output and returns dataframe.
     """
 
-    print("---------------------------------------------------------")
+    print("----------------------------------------------------------------------------------------")
     print(f"Querying NASA Exoplanet Archive for TIC {ticid} ...")
 
     # Step 1: Try pscomppars first
@@ -457,7 +455,7 @@ def query_params_NEA(ticid):
     if df_psc is not None and not df_psc.empty:
         print(f"pscomppars entry FOUND for TIC {ticid}:")
         print(df_psc)
-        print("---------------------------------------------------------")
+        print("----------------------------------------------------------------------------------------")
         return df_psc
 
     print(f"No pscomppars entry found for TIC {ticid}. Trying TOI table...")
@@ -468,7 +466,7 @@ def query_params_NEA(ticid):
 
         if df_toi is None or df_toi.empty:
             print(f"No TOI entry found for TIC {ticid}.")
-            print("---------------------------------------------------------")
+            print("----------------------------------------------------------------------------------------")
             return None
 
         # Step 3: Infer parameters
@@ -484,12 +482,12 @@ def query_params_NEA(ticid):
 
         print(f"Returning combined TOI + inferred parameters for TIC {ticid}:")
         print(combined)
-        print("---------------------------------------------------------")
+        print("----------------------------------------------------------------------------------------")
         return combined
 
     except Exception as e:
         print(f"Error querying TOI table for TIC {ticid}: {e}")
-        print("---------------------------------------------------------")
+        print("----------------------------------------------------------------------------------------")
         return None
 
 
