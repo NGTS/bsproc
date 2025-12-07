@@ -122,7 +122,6 @@ if __name__ == "__main__":
     #      HardCoded values for other names - ToDo: implement Sam's SIMBAD querying    
     # logger_main, obj_ticid = bspd.get_target_tic_id(logger_main, object_name)
     obj_ticid = args.tic_id
-   
   
     #if set --predict_model,then create a csv file including the batman model for the parameters queried from NASA Exoplanet Archive
     if args.predict_model:

@@ -143,7 +143,9 @@ def tranmodel(actionlist, ticid, nights, night_outdir_dict, logger= None):
     results = []
     for night in nights:
         #2. Find the actionids for each night in actionlist
-        actions_onen= [a["action_id"] for a in actionlist if a["night"] == night]
+        actions_onen = actionlist.loc[actionlist["night"]==night,"action_id"].tolist()
+        if len(actions_onen)==0:
+                logger.info(f"[BMLC]No actions found on night:{night}")
         outdir = night_outdir_dict[night]
 
         night = str(night)
