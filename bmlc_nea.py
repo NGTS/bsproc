@@ -1,42 +1,64 @@
 import batman
 import pandas as pd
 import numpy as np
-import pymysql
+
 import QueryNEA as QNEA
 import os
 import astropy.io.fits as pyfits
-import pymysql
+
+import pymysql  
+import logger
 
 ## search actionid in ngts action_summary_log in database using pymysql
-def get_actionid(ticid, night):
-    connection = pymysql.connect(host='ngtsdb', user = 'pipe', database='ngts_ops')
+#def get_actionid(ticid, night):
+#   connection = pymysql.connect(host='ngtsdb', user = 'pipe', database='ngts_ops')
 
-    with connection.cursor() as cur:
-        cur.execute(f"""
-            SELECT action_id, num_images
-            FROM action_summary_log
-            WHERE campaign LIKE '%{ticid}%'
-              AND night = '{night}'
-            ORDER BY num_images DESC      
-            LIMIT 1;       
-        """)
-        result = cur.fetchone()
+#    with connection.cursor() as cur:
+#        cur.execute(f"""
+#            SELECT action_id, num_images
+#           FROM action_summary_log
+#            WHERE campaign LIKE '%{ticid}%'
+#              AND night = '{night}'
+#            ORDER BY num_images DESC      
+#            LIMIT 1;       
+#        """)
+#       result = cur.fetchone()
 
-    return(result)
+#    return(result)
+
+
+def get_bjd_range(actions):
+    all_bjds = []
+
+    for action_id in actions:
+        try:
+            bjds = get_ngpipe_bjd(action_id)
+            all_bjds.append(bjds)
+        except Exception as e:
+            print(f"[BMLC]Failed in fetching bjd time for actions:{e}")
+
+    if len(all_bjds) == 0:
+        print("[BMLC] No valid BJD data found for any action.")
+        return None, None
+    bjds = np.concatenate(all_bjds)
+    t_start = np.min(bjds)
+    t_end   = np.max(bjds)
+
+    return t_start, t_end
 
 ## read the BJDs using action_id 
 def get_ngpipe_bjd(ac_id, ngpipe_op_dir = "/ngts/PAOPhot2/"):
     """
     Get BJD for NGTS action
     """
-    phot_file_dir = ngpipe_op_dir + f'bs_photometry/action{ac_id}/'
+    phot_file_dir = ngpipe_op_dir + f'photometry/action{ac_id}/'
     if os.path.exists(phot_file_dir):
         print('Found photometry directory')
         phot_file_root = phot_file_dir + f'ACTION_{ac_id}_'
     else:
         print(f'Can\'t find photometry for Action {ac_id}')
         print('Trying "old" directory')
-        phot_file_dir = ngpipe_op_dir + f'old/photometry_old/action{ac_id}/'
+        phot_file_dir = ngpipe_op_dir + f'bs_photometry/action{ac_id}/'
         if os.path.exists(phot_file_dir):
             print('Found "old" photometry directory')
             phot_file_root = phot_file_dir + f'ACTION_{ac_id}_'
@@ -136,36 +158,28 @@ def save_transit_csv(t, flux, tc, ticid, night):
 #t, flux, tc= predict_transit_curve(ticid, t_start, t_end)
 #save_transit_csv(t, flux, tc, ticid, night)
 
-def tranmodel(ticid, nights):
+def tranmodel(actions, ticid, nights, logger= None):
     #1. call query and prepare parameters for Batman
     df = QNEA.query_params_NEA(ticid)
     if df is None or len(df) == 0:
-        raise ValueError(f"No NEA parameters found for TIC {ticid}")
+        logger.error(f"No NEA parameters found for TIC {ticid}")
+        return None
+    
     row = df.iloc[0]
     results = []
     for night in nights:
         night = str(night)
-        # 2. find action ID    
-        action_id = (get_actionid(ticid, night) or [None])[0]
-        if action_id is None:
-            print(f"[BMLC] No action ID for TIC {ticid} on night {night}")
-            return None
+        # 2. from bspd : find_target_actions, actions have been searched,  
+        t_start, t_end = get_bjd_range(actions)
 
-        # Step 2: read BJD array
-        bjds = get_ngpipe_bjd(action_id)
-        if bjds is None or len(bjds)==0:
-            print(f"[BMLC] No BJD data for action {action_id}")
-            return None
+        logger.info(f"FOR ACTION: {actions} ----Start BJD: {t_start}, End BJD: {t_end}")
 
-        t_start = bjds.min()
-        t_end   = bjds.max()
-
-        # 3. batman prediction
+        # 4. batman prediction
         t, flux, tc = predict_transit_curve(row, t_start, t_end)
 
-        #4. save output
+        #5. save output
         save_transit_csv(t, flux, tc, ticid, night)
-        print(f"[BMLC] Saved predicted light curve for {ticid} on {night}")
+        logger.info(f"[BMLC] Saved predicted light curve for {ticid} on {night}")
         results.append((night, t, flux, tc))
 
     return results

@@ -58,6 +58,8 @@ def ParseArgs():
                         help='Exposure time of observations')
     parser.add_argument('--force_new_csv', action='store_true',
                         help='Provide this to force a new phot csv file to be created. WARNING - any existing BSP output files will be overwritten')
+    parser.add_argument('--predict_model', action='store_true',
+                        help='If set, query NEA parameters and generate a predicted transit light curve using batman. OPTIONAl. A csv file and A plot fitting observations will be saved.')
     return parser.parse_args()
 
 if __name__ == "__main__":
@@ -121,8 +123,9 @@ if __name__ == "__main__":
     # logger_main, obj_ticid = bspd.get_target_tic_id(logger_main, object_name)
     obj_ticid = args.tic_id
 
+    # 现在我有actions，1. 从中找到最多数量最多的那个，或者，2. 直接读对应的BJD，然后用最早和最晚时间。
     # create a csv file including the batman model for the parameters queried from NASA Exoplanet Archive
-    BMmodel = tranmodel(obj_ticid,observation_nights)
+    BMmodel = tranmodel( actions, obj_ticid, observation_nights,logger_main)
 
     # This function call runs the main BSP process.
     # This process includes - 
