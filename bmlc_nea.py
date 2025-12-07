@@ -114,7 +114,7 @@ def save_transit_csv(t, flux, tc, ticid, night, outdir = None,logger=None):
         logger.info("[BMLC]Create an output directory:{outdir}")
     os.makedirs(outdir, exist_ok=True)
    
-    filename = os.path.join(out_dir, f"{ticid}_{night}_model.csv")
+    filename = os.path.join(outdir, f"{ticid}_{night}_model.csv")
     with open(filename, "w") as f:
         f.write(f"# TIC {ticid}, Night {night}\n")
         f.write(f"# Transit midtime (Tc) = {tc:.10f}\n")
@@ -154,7 +154,7 @@ def tranmodel(actions, ticid, nights, night_outdir_dict, logger= None):
         bjdt, flux, tc = predict_transit_curve(row, t_start, t_end)
 
         #5. save output
-        save_transit_csv(bjdt, flux, tc, ticid, night, output_dir = outdir, logger)
+        save_transit_csv(bjdt, flux, tc, ticid, night, outdir, logger)
         logger.info(f"[BMLC] Saved predicted light curve for {ticid} on {night}")
         results.append((night, bjdt, flux, tc))
 
