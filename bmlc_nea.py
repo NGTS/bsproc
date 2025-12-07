@@ -132,7 +132,7 @@ def save_transit_csv(t, flux, tc, ticid, night, outdir = None,logger=None):
 #t, flux, tc= predict_transit_curve(ticid, t_start, t_end)
 #save_transit_csv(t, flux, tc, ticid, night)
 
-def tranmodel(actions, ticid, nights, night_outdir_dict, logger= None):
+def tranmodel(actionlist, ticid, nights, night_outdir_dict, logger= None):
     #1. call query and prepare parameters for Batman
     df = QNEA.query_params_NEA(ticid)
     if df is None or len(df) == 0:
@@ -142,18 +142,20 @@ def tranmodel(actions, ticid, nights, night_outdir_dict, logger= None):
     row = df.iloc[0]
     results = []
     for night in nights:
+        #2. Find the actionids for each night in actionlist
+        actions_onen= [a["action_id"] for a in actionlist if a["night"] == night]
         outdir = night_outdir_dict[night]
 
         night = str(night)
-        # 2. from bspd : find_target_actions, actions have been searched,  
-        t_start, t_end = get_bjd_range(actions)
+        # 3. from bspd : find_target_actions, actions have been searched,  
+        t_start, t_end = get_bjd_range(actions_onen)
 
-        logger.info(f"FOR ACTION: {actions} ----Start BJD: {t_start}, End BJD: {t_end}")
+        logger.info(f"FOR ACTION: {actions_onen} ----Start BJD: {t_start}, End BJD: {t_end}")
 
         # 4. batman prediction
         bjdt, flux, tc = predict_transit_curve(row, t_start, t_end)
 
-        #5. save output
+        # 5. save output
         save_transit_csv(bjdt, flux, tc, ticid, night, outdir, logger)
         logger.info(f"[BMLC] Saved predicted light curve for {ticid} on {night}")
         results.append((night, bjdt, flux, tc))

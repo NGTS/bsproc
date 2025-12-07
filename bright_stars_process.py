@@ -127,7 +127,7 @@ if __name__ == "__main__":
     #if set --predict_model,then create a csv file including the batman model for the parameters queried from NASA Exoplanet Archive
     if args.predict_model:
       logger_main.info("[BMLC] Predicting transit model as requested...")
-      BMmodel = tranmodel( actions, obj_ticid, observation_nights, night_outdir_dict, logger_main)
+      BMmodel = tranmodel(actionlist, obj_ticid, observation_nights, night_outdir_dict, logger_main)
     else:
       logger_main.info("[BMLC] --predict_model not set, skipping transit model generation.")
 
