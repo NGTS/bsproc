@@ -1,31 +1,9 @@
 import batman
 import pandas as pd
 import numpy as np
-
 import QueryNEA as QNEA
 import os
 import astropy.io.fits as pyfits
-
-import pymysql  
-import logger
-
-## search actionid in ngts action_summary_log in database using pymysql
-#def get_actionid(ticid, night):
-#   connection = pymysql.connect(host='ngtsdb', user = 'pipe', database='ngts_ops')
-
-#    with connection.cursor() as cur:
-#        cur.execute(f"""
-#            SELECT action_id, num_images
-#           FROM action_summary_log
-#            WHERE campaign LIKE '%{ticid}%'
-#              AND night = '{night}'
-#            ORDER BY num_images DESC      
-#            LIMIT 1;       
-#        """)
-#       result = cur.fetchone()
-
-#    return(result)
-
 
 def get_bjd_range(actions):
     all_bjds = []
@@ -129,16 +107,6 @@ def predict_transit_curve(row, t_start, t_end):
     flux = m.light_curve(params)
     return t, flux, tc
 
-#def save_transit_csv(t, flux, tc, ticid, night):
-    df = pd.DataFrame({
-        "BJD": t,
-        "Flux_Model": flux,
-        "Transit_mid": tc
-    })
-
-    filename = f"{ticid}_{night}_transit_model_predict.csv"
-    df.to_csv(filename, index=False)
-
 def save_transit_csv(t, flux, tc, ticid, night):
     filename = f"{ticid}_{night}_model.csv"
     with open(filename, "w") as f:
@@ -147,7 +115,7 @@ def save_transit_csv(t, flux, tc, ticid, night):
         f.write("BJD,FLUX\n")
         for ti, fi in zip(t, flux):
             f.write(f"{ti},{fi}\n")
-    print(f"[BMLC] Saved {filename}")
+    
 
 #ticid = "276754403"
 #night = "2025-07-15"
@@ -175,12 +143,12 @@ def tranmodel(actions, ticid, nights, logger= None):
         logger.info(f"FOR ACTION: {actions} ----Start BJD: {t_start}, End BJD: {t_end}")
 
         # 4. batman prediction
-        t, flux, tc = predict_transit_curve(row, t_start, t_end)
+        bjdt, flux, tc = predict_transit_curve(row, t_start, t_end)
 
         #5. save output
-        save_transit_csv(t, flux, tc, ticid, night)
+        save_transit_csv(bjdt, flux, tc, ticid, night)
         logger.info(f"[BMLC] Saved predicted light curve for {ticid} on {night}")
-        results.append((night, t, flux, tc))
+        results.append((night, bjdt, flux, tc))
 
     return results
 

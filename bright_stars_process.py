@@ -122,10 +122,14 @@ if __name__ == "__main__":
     #      HardCoded values for other names - ToDo: implement Sam's SIMBAD querying    
     # logger_main, obj_ticid = bspd.get_target_tic_id(logger_main, object_name)
     obj_ticid = args.tic_id
-
-    # 现在我有actions，1. 从中找到最多数量最多的那个，或者，2. 直接读对应的BJD，然后用最早和最晚时间。
-    # create a csv file including the batman model for the parameters queried from NASA Exoplanet Archive
-    BMmodel = tranmodel( actions, obj_ticid, observation_nights,logger_main)
+   
+  
+    #if set --predict_model,then create a csv file including the batman model for the parameters queried from NASA Exoplanet Archive
+    if args.predict_model:
+      logger_main.info("[BMLC] Predicting transit model as requested...")
+      BMmodel = tranmodel( actions, obj_ticid, observation_nights,logger_main)
+    else:
+      logger_main.info("[BMLC] --predict_model not set, skipping transit model generation.")
 
     # This function call runs the main BSP process.
     # This process includes - 
