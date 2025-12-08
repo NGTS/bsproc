@@ -1,5 +1,4 @@
 import batman
-import pandas as pd
 import numpy as np
 import QueryNEA as QNEA
 import os
@@ -12,6 +11,7 @@ def get_bjd_range(actions):
         try:
             bjds = get_ngpipe_bjd(action_id)
             all_bjds.append(bjds)
+
         except Exception as e:
             print(f"[BMLC]Failed in fetching bjd time for actions:{e}")
 
@@ -105,9 +105,18 @@ def predict_transit_curve(row, t_start, t_end):
     t = np.linspace(t_start, t_end, 1000)
     m = batman.TransitModel(params, t)
     flux = m.light_curve(params)
-    return t, flux, tc
+    
+    # 5. calculate transit duration for reference: P,aRS,k,b,inc
+    k = row['pl_ratror']      # Rp/R*
+    inc1 = np.radians(params.inc)   # radians
 
-def save_transit_csv(t, flux, tc, ticid, night, outdir = None,logger=None):
+    T14 = (P/np.pi) * np.arcsin( (1/aRs) * np.sqrt((1 + k)**2 - b**2) / np.sin(inc1) )
+    dt = T14 / 2.
+    T1 = tc - dt
+    T4 = tc + dt
+    return t, flux, tc, T1, T4
+
+def save_transit_csv(t, flux, tc, T1, T4, ticid, night, outdir = None,logger=None):
     if outdir is None:
         logger.info("Can\'t find the output directory")
         outdir = f"./bsproc_outputs/{ticid}/{night}/model/"
@@ -116,9 +125,15 @@ def save_transit_csv(t, flux, tc, ticid, night, outdir = None,logger=None):
    
     filename = os.path.join(outdir, f"{ticid}_{night}_model.csv")
     with open(filename, "w") as f:
+        # Comment header 
         f.write(f"# TIC {ticid}, Night {night}\n")
         f.write(f"# Transit midtime (Tc) = {tc:.10f}\n")
-        f.write("BJD,FLUX\n")
+        f.write(f"# T1 = {T1:.10f}\n")
+        f.write(f"# T4 = {T4:.10f}\n")
+
+        # Column header
+        f.write("BJD,Flux\n")
+
         for ti, fi in zip(t, flux):
             f.write(f"{ti},{fi}\n")
     
@@ -143,9 +158,7 @@ def tranmodel(actionlist, ticid, nights, night_outdir_dict, logger= None):
     results = []
     for night in nights:
         #2. Find the actionids for each night in actionlist
-        actions_onen = actionlist.loc[actionlist["night"]==night,"action_id"].tolist()
-        if len(actions_onen)==0:
-                logger.info(f"[BMLC]No actions found on night:{night}")
+        actions_onen= actionlist['action_id'][ actionlist['night'] == night ].to_numpy()
         outdir = night_outdir_dict[night]
 
         night = str(night)
@@ -155,12 +168,12 @@ def tranmodel(actionlist, ticid, nights, night_outdir_dict, logger= None):
         logger.info(f"FOR ACTION: {actions_onen} ----Start BJD: {t_start}, End BJD: {t_end}")
 
         # 4. batman prediction
-        bjdt, flux, tc = predict_transit_curve(row, t_start, t_end)
+        bjd, flux, tc, T1, T4 = predict_transit_curve(row, t_start, t_end)
 
         # 5. save output
-        save_transit_csv(bjdt, flux, tc, ticid, night, outdir, logger)
+        save_transit_csv(bjd, flux, tc, T1, T4, ticid, night, outdir, logger)
         logger.info(f"[BMLC] Saved predicted light curve for {ticid} on {night}")
-        results.append((night, bjdt, flux, tc))
+        results.append((night, bjd, flux, tc, T1, T4))
 
     return results
 
