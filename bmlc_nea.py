@@ -4,19 +4,19 @@ import QueryNEA as QNEA
 import os
 import astropy.io.fits as pyfits
 
-def get_bjd_range(actions):
+def get_bjd_range(actions,logger):
     all_bjds = []
 
     for action_id in actions:
         try:
-            bjds = get_ngpipe_bjd(action_id)
+            bjds = get_ngpipe_bjd(action_id,logger)
             all_bjds.append(bjds)
 
         except Exception as e:
-            print(f"[BMLC]Failed in fetching bjd time for actions:{e}")
+            logger.error(f"[BMLC]Failed in fetching bjd time for actions:{e}")
 
     if len(all_bjds) == 0:
-        print("[BMLC] No valid BJD data found for any action.")
+        logger.info("[BMLC] No valid BJD data found for any action.")
         return None, None
     bjds = np.concatenate(all_bjds)
     t_start = np.min(bjds)
@@ -25,24 +25,24 @@ def get_bjd_range(actions):
     return t_start, t_end
 
 ## read the BJDs using action_id 
-def get_ngpipe_bjd(ac_id, ngpipe_op_dir = "/ngts/PAOPhot2/"):
+def get_ngpipe_bjd(ac_id,logger=None, ngpipe_op_dir = "/ngts/PAOPhot2/"):
     """
     Get BJD for NGTS action
     """
     phot_file_dir = ngpipe_op_dir + f'photometry/action{ac_id}/'
     if os.path.exists(phot_file_dir):
-        print('Found photometry directory')
+        logger.info(f'Found BJD for action {ac_id} in photometry directory.')
         phot_file_root = phot_file_dir + f'ACTION_{ac_id}_'
     else:
-        print(f'Can\'t find photometry for Action {ac_id}')
-        print('Trying "old" directory')
+        logger.info(f'Can\'t find photometry for Action {ac_id}')
+        logger.info('Trying searching BJD "old" directory')
         phot_file_dir = ngpipe_op_dir + f'bs_photometry/action{ac_id}/'
         if os.path.exists(phot_file_dir):
-            print('Found "old" photometry directory')
+            logger.info(f'Found BJD for action {ac_id} in "old" photometry directory')
             phot_file_root = phot_file_dir + f'ACTION_{ac_id}_'
         else:
-            print(f'No photometry for Action {ac_id}')
-            print(f'Skipping Action {ac_id}.')
+            logger.info(f'No photometry for Action {ac_id}')
+            logger.info(f'Skipping Action {ac_id}.')
             return None, None, None, None, None, None, None, None
     # BJD from ngpipe is saved in seconds from a specific time.
     #  The correction applied is to convert it to human understandable units
@@ -107,28 +107,33 @@ def predict_transit_curve(row, t_start, t_end):
     flux = m.light_curve(params)
     
     # 5. calculate transit duration for reference: P,aRS,k,b,inc
+    # Some of params may be nan,then T1,T4 will be returned as nan.
     k = row['pl_ratror']      # Rp/R*
     inc1 = np.radians(params.inc)   # radians
-
-    T14 = (P/np.pi) * np.arcsin( (1/aRs) * np.sqrt((1 + k)**2 - b**2) / np.sin(inc1) )
+    if np.all(~np.isnan([P, aRs, k, b, inc1])):
+        T14 = (P/np.pi) * np.arcsin((1/aRs) * np.sqrt((1 + k)**2 - b**2) / np.sin(inc1))
+    else:
+        return t, flux, tc, None, None
     dt = T14 / 2.
     T1 = tc - dt
     T4 = tc + dt
     return t, flux, tc, T1, T4
 
-def save_transit_csv(t, flux, tc, T1, T4, ticid, night, outdir = None,logger=None):
+def save_transit_csv(t, flux, tc, T1, T4, ticid, night, logger, outdir = None):
     if outdir is None:
-        logger.info("Can\'t find the output directory")
-        outdir = f"./bsproc_outputs/{ticid}/{night}/model/"
-        logger.info("[BMLC]Create an output directory:{outdir}")
+        outdir = f"./bsproc_outputs/{ticid}/{night}"
+        logger.info(f"[BMLC] No outdir provided, using default: {outdir}")
     os.makedirs(outdir, exist_ok=True)
+    model_dir = os.path.join(outdir, "model")
+
+    os.makedirs(model_dir, exist_ok=True)
    
-    filename = os.path.join(outdir, f"{ticid}_{night}_model.csv")
+    filename = os.path.join(model_dir, f"{ticid}_{night}_model.csv")
     with open(filename, "w") as f:
         # Comment header 
         f.write(f"# TIC {ticid}, Night {night}\n")
         f.write(f"# Transit midtime (Tc) = {tc:.10f}\n")
-        f.write(f"# T1 = {T1:.10f}\n")
+        f.write(f"# T1 = {T1:.10f}\n") 
         f.write(f"# T4 = {T4:.10f}\n")
 
         # Column header
@@ -136,6 +141,7 @@ def save_transit_csv(t, flux, tc, T1, T4, ticid, night, outdir = None,logger=Non
 
         for ti, fi in zip(t, flux):
             f.write(f"{ti},{fi}\n")
+    return filename
     
 
 #ticid = "276754403"
@@ -163,7 +169,7 @@ def tranmodel(actionlist, ticid, nights, night_outdir_dict, logger= None):
 
         night = str(night)
         # 3. from bspd : find_target_actions, actions have been searched,  
-        t_start, t_end = get_bjd_range(actions_onen)
+        t_start, t_end = get_bjd_range(actions_onen, logger)
 
         logger.info(f"FOR ACTION: {actions_onen} ----Start BJD: {t_start}, End BJD: {t_end}")
 
@@ -171,9 +177,12 @@ def tranmodel(actionlist, ticid, nights, night_outdir_dict, logger= None):
         bjd, flux, tc, T1, T4 = predict_transit_curve(row, t_start, t_end)
 
         # 5. save output
-        save_transit_csv(bjd, flux, tc, T1, T4, ticid, night, outdir, logger)
+        model_dir = os.path.join(outdir, "model")
+        os.makedirs(model_dir, exist_ok=True)
+        model_file = save_transit_csv(bjd, flux, tc, T1, T4, ticid, night, logger, model_outdir)
         logger.info(f"[BMLC] Saved predicted light curve for {ticid} on {night}")
+        
         results.append((night, bjd, flux, tc, T1, T4))
 
-    return results
+    return results, model_file
 

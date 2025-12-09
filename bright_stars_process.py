@@ -14,6 +14,7 @@ import BSP_utils as bspu
 import BSP_db as bspd
 import BSP_phot as bspp
 from bmlc_nea import tranmodel
+from  BSP_bmlc_ops import moplot
 
 def ParseArgs():
     """
@@ -125,8 +126,7 @@ if __name__ == "__main__":
   
     #if set --predict_model,then create a csv file including the batman model for the parameters queried from NASA Exoplanet Archive
     if args.predict_model:
-      logger_main.info("[BMLC] Predicting transit model as requested...")
-      BMmodel = tranmodel(actionlist, obj_ticid, observation_nights, night_outdir_dict, logger_main)
+      BMmodel, model_file = tranmodel(actionlist, obj_ticid, observation_nights, night_outdir_dict, logger_main)
     else:
       logger_main.info("[BMLC] --predict_model not set, skipping transit model generation.")
 
@@ -154,3 +154,6 @@ if __name__ == "__main__":
         missing_action_store, output_file_name_store, actions, night_store,
         observation_nights, object_name, obj_ticid, args, outdir_main
         )
+
+    if args.predict_model:
+      moplot(logger_main, night_outdir_dict, obj_ticid, observation_nights, model_file)
