@@ -73,9 +73,17 @@ def plot_data(model, obs, op_name, bin_step=0.004):
     median = np.median( df2['FluxNorm'] )
     std = np.std( df2['FluxNorm'] )
     mask_good = np.abs( df2['FluxNorm'] - median) < 3 * std
-    obsflux = df2['FluxNorm'][mask_good]
-    obsbjd  = df2['BJD'][mask_good]
-    obsfluxerr = df2['FluxNormErr'][mask_good]
+    # Step3.5: we cut the obs to the night in predicted model
+    time0 = df1["BJD"].iloc[0]
+    time1 = df1["BJD"].iloc[-1]
+    margin = 0.1 # days, enough to constrain the obs_lc for one night.
+    mask_night = (df2['BJD'] >= (time0 - margin)) & (df2['BJD'] <= (time1+ margin))
+    mask_obs = mask_good & mask_night
+
+
+    obsflux = df2['FluxNorm'][mask_obs]
+    obsbjd  = df2['BJD'][mask_obs]
+    obsfluxerr = df2['FluxNormErr'][mask_obs]
 
     # Step4: Merge duplicate time points
     time, flux, fluxerr = merge_duplicates(obsbjd, obsflux, obsfluxerr)
