@@ -14,7 +14,7 @@ import BSP_utils as bspu
 import BSP_db as bspd
 import BSP_phot as bspp
 from bmlc_nea import tranmodel
-from  BSP_bmlc_ops import moplot
+from  BSP_bmlc_obs import moplot
 
 def ParseArgs():
     """
@@ -129,7 +129,10 @@ if __name__ == "__main__":
       BMmodel, model_file = tranmodel(actionlist, obj_ticid, observation_nights, night_outdir_dict, logger_main)
     else:
       logger_main.info("[BMLC] --predict_model not set, skipping transit model generation.")
-
+    print(model_file)
+    if args.predict_model:
+      moplot(logger_main, night_outdir_dict, obj_ticid, observation_nights, model_file)
+  
     # This function call runs the main BSP process.
     # This process includes - 
     #     Finding the relevant fits file outputs from ngpipe for the actions
@@ -155,5 +158,4 @@ if __name__ == "__main__":
         observation_nights, object_name, obj_ticid, args, outdir_main
         )
 
-    if args.predict_model:
-      moplot(logger_main, night_outdir_dict, obj_ticid, observation_nights, model_file)
+

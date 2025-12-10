@@ -44,7 +44,7 @@ def merge_duplicates(time, flux, flux_err=None):
 
     return uniq_time, flux_mean, flux_err_mean
     
-def plot_data(model, obs, op_dir,bin_step=0.004):
+def plot_data(model, obs, op_name, bin_step=0.004):
     # Step1： Read model file
     with open(model, 'r') as f:
         lines = f.readlines()
@@ -110,8 +110,8 @@ def plot_data(model, obs, op_dir,bin_step=0.004):
     plt.title(title_text)
     plt.xlabel(f'BJD - {bjd0} Days', fontsize=14)
     plt.ylabel('Normalised Flux', fontsize=14)
-    plt.savefig(op_dir+f'/obs_model_comparison', dpi=300)
     plt.legend()
+    plt.savefig(op_name, dpi = 500)
     plt.show()  
     plt.close()
 
@@ -127,8 +127,10 @@ def moplot_single(logger, outdir, ticid, night, model_file):
         logger.info(f"[PLOT] Found model file: {model_file}")
 
     # 2. Locate OBS LC file (obs is in outdir/)
-
-    obs_pattern = os.path.join(outdir, "*master_apers_bsproc_lc.dat")
+    outdir = outdir.rstrip("/")
+    obs_search_dir = os.path.dirname(outdir)
+    logger.info(f"[PLOT] Searching obs LC in: {obs_search_dir}")
+    obs_pattern = os.path.join(obs_search_dir, "*master_apers_bsproc_lc.dat")
     obs_files = glob.glob(obs_pattern)
 
     if len(obs_files) == 0:
@@ -141,10 +143,10 @@ def moplot_single(logger, outdir, ticid, night, model_file):
     logger.info(f"[PLOT] Found obs LC: {obs_file}")
 
     # 3. Create directory for saving model related results
-    model_dir = os.path.join(outdir, "model")
-    os.makedirs(model_dir, exist_ok=True)
-
-    output_png = os.path.join(model_dir, f"{ticid}_{night}_model_vs_obs.png")
+    figure_dir = os.path.join(outdir, "model_plots")
+    os.makedirs(figure_dir, exist_ok=True)
+    output_png = os.path.join(figure_dir, f"{ticid}_{night}_model_vs_obs.png")
+    logger.info(f"[PLOT] Saving plot to: {figure_dir}")
 
     # 4. Call plot function
     try:
@@ -161,8 +163,20 @@ def moplot_single(logger, outdir, ticid, night, model_file):
 #obsfilefile= "/Users/urnotlizzy/Downloads/NGTS_TIC-139528693_2025-11-10_2025-11-11_2025-11-12.txt"
 #output_dir = "/Users/urnotlizzy/Documents/code/bsproc"
 
-def moplot(logger, outdir, ticid, nights, model_files):
+def moplot(logger, night_outdir_dict, ticid, nights, model_files):
 
-    for night, model_file in zip(nights, model_files):
-        logger.info(f"[PLOT] Processing night: {night}")
-        moplot_single(logger, outdir, ticid, night, model_file)
+    if isinstance(nights, str):
+        nights = [nights]
+    if isinstance(model_files, str):
+        model_files = [model_files]
+
+    if len(nights) != len(model_files):
+        logger.error("[PLOT] nights and model_files length mismatch!")
+        return
+
+    for night, modelfile in zip(nights, model_files):
+
+        nightly_outdir = night_outdir_dict[night]
+
+        logger.info(f"[PLOT] Processing night {night}, dir={nightly_outdir}")
+        moplot_single(logger, nightly_outdir, ticid, night, modelfile)

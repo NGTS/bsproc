@@ -162,11 +162,11 @@ def tranmodel(actionlist, ticid, nights, night_outdir_dict, logger= None):
     
     row = df.iloc[0]
     results = []
+    model_files = []
     for night in nights:
         #2. Find the actionids for each night in actionlist
         actions_onen= actionlist['action_id'][ actionlist['night'] == night ].to_numpy()
         outdir = night_outdir_dict[night]
-
         night = str(night)
         # 3. from bspd : find_target_actions, actions have been searched,  
         t_start, t_end = get_bjd_range(actions_onen, logger)
@@ -179,10 +179,11 @@ def tranmodel(actionlist, ticid, nights, night_outdir_dict, logger= None):
         # 5. save output
         model_dir = os.path.join(outdir, "model")
         os.makedirs(model_dir, exist_ok=True)
-        model_file = save_transit_csv(bjd, flux, tc, T1, T4, ticid, night, logger, model_outdir)
+        model_files.append(save_transit_csv(bjd, flux, tc, T1, T4, ticid, night, logger, outdir))
         logger.info(f"[BMLC] Saved predicted light curve for {ticid} on {night}")
         
         results.append((night, bjd, flux, tc, T1, T4))
 
-    return results, model_file
+    return results, model_files
+
 
