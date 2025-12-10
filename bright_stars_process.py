@@ -130,9 +130,7 @@ if __name__ == "__main__":
     else:
       logger_main.info("[BMLC] --predict_model not set, skipping transit model generation.")
     print(model_file)
-    if args.predict_model:
-      moplot(logger_main, night_outdir_dict, obj_ticid, observation_nights, model_file)
-  
+
     # This function call runs the main BSP process.
     # This process includes - 
     #     Finding the relevant fits file outputs from ngpipe for the actions
@@ -158,4 +156,7 @@ if __name__ == "__main__":
         observation_nights, object_name, obj_ticid, args, outdir_main
         )
 
-
+    # if set model predicted, then it will plot the observations with the model together.
+    if args.predict_model:
+      moplot(logger_main, night_outdir_dict, obj_ticid, observation_nights, model_file)
+  

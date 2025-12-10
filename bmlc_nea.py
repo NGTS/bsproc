@@ -143,16 +143,6 @@ def save_transit_csv(t, flux, tc, T1, T4, ticid, night, logger, outdir = None):
             f.write(f"{ti},{fi}\n")
     return filename
     
-
-#ticid = "276754403"
-#night = "2025-07-15"
-#action_id = (get_actionid(ticid,night) or [None])[0]
-#bjds = get_ngpipe_bjd(action_id)
-#t_start = bjds.min()
-#t_end   = bjds.max()
-#t, flux, tc= predict_transit_curve(ticid, t_start, t_end)
-#save_transit_csv(t, flux, tc, ticid, night)
-
 def tranmodel(actionlist, ticid, nights, night_outdir_dict, logger= None):
     #1. call query and prepare parameters for Batman
     df = QNEA.query_params_NEA(ticid)
