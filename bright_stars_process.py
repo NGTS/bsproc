@@ -129,7 +129,7 @@ if __name__ == "__main__":
       BMmodel, model_file = tranmodel(actionlist, obj_ticid, observation_nights, night_outdir_dict, logger_main)
     else:
       logger_main.info("[BMLC] --predict_model not set, skipping transit model generation.")
-    print(model_file)
+    # print(model_file)
 
     # This function call runs the main BSP process.
     # This process includes - 
@@ -156,7 +156,8 @@ if __name__ == "__main__":
         observation_nights, object_name, obj_ticid, args, outdir_main
         )
 
-    # if set model predicted, then it will plot the observations with the model together.
+    # After running the main process, the output file includes the obs lc ".dat" file
+    #if setted model prediction, then the obs lc will plotted with the model created using NEA params in BATMAN.
     if args.predict_model:
       moplot(logger_main, night_outdir_dict, obj_ticid, observation_nights, model_file)
   

@@ -20,27 +20,26 @@ def extract_title(obsfilename):
     return title, columns_line
 
 
-def merge_duplicates(time, flux, flux_err=None):
+def merge_duplicates(time, flux, flux_err):
     """
-    merge duplictaes according to the mean value of fluxes and flux errors at the same time points. 
+    Merge duplicated time points by averaging fluxes and flux errors.
     """
-    # there are different flux values with same time points for different actions.
-    # So merges should be done.
     time = np.array(time)
     flux = np.array(flux)
-    if flux_err is not None:
-        flux_err = np.array(flux_err)
+    flux_err = np.array(flux_err)
 
     uniq_time, inv_idx, counts = np.unique(time, return_inverse=True, return_counts=True)
+
+    # flux mean
     flux_sum = np.bincount(inv_idx, weights=flux)
     flux_mean = flux_sum / counts
-    
+
+    # error propagation
     err_sum = np.bincount(inv_idx, weights=flux_err**2)
     flux_err_mean = np.sqrt(err_sum) / counts
-    else:
-        flux_err_mean = None
 
     return uniq_time, flux_mean, flux_err_mean
+
     
 def plot_data(model, obs, op_name, bin_step=0.004):
     """
