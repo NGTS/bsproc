@@ -370,64 +370,77 @@ def query_params_from_toi(ticid):
 # query latest time parameters (TC , P) in ps table 
 def query_latest_time_from_ps(ticid):
     url = "https://exoplanetarchive.ipac.caltech.edu/TAP/sync"
-    # order the result with rowupdate
     qry = f"""
     SELECT 
-        pl_name, hostname, tic_id, pl_orbper, pl_tranmid,
+        pl_name, hostname, tic_id,
+        pl_orbper, pl_tranmid,
         rowupdate, pl_pubdate, releasedate
     FROM ps
     WHERE tic_id LIKE '%{ticid}%'
-    ORDER BY  pl_pubdate DESC, rowupdate DESC, releasedate DESC
-    """  
+    ORDER BY pl_pubdate DESC, rowupdate DESC, releasedate DESC
+    """
 
     try:
         r = requests.get(url, params={"query": qry, "format": "csv"}, timeout=60)
         r.raise_for_status()
-        df = pd.read_csv(io.BytesIO(r.content))
 
+        df = pd.read_csv(io.BytesIO(r.content))
         if df.empty:
             print(f"No entry in ps table for TIC {ticid}")
             return None
-        
-    # find the latest set of valid values of time terms
-        valid = df.dropna(subset=["pl_orbper","pl_tranmid"])
-        if valid.empty:
-            print("No tranmid and orbper satisfied")
 
-        return valid.iloc[0]
+        # only save rows with valid P and Tc
+        valid = df.dropna(subset=["pl_orbper", "pl_tranmid"])
+        if valid.empty:
+            print("No valid orbper/tranmid in ps")
+            return None
+
+        return valid 
 
     except Exception as e:
         print(f"Error when querying ps: {e}")
-        return None    
+        return None
 
 
 # Combine the pscomppars and ps tables: replace P, tc in pscomppars
 def get_best_params(ticid):
-    # 1. pscomppars 
-    df_comp = query_params_from_pscomppars(ticid)
-    if df_comp is None or len(df_comp)==0:
+    # 1. pscomppars
+    df_comps = query_params_from_pscomppars(ticid)
+    if df_comps is None or len(df_comps) == 0:
         print("No entry in pscomppars")
         return None
-    comp = df_comp.iloc[0].copy() 
 
     # 2. ps
-    result = query_latest_time_from_ps(ticid)
-    if result is not None:
-        latest_ps = result
+    df_ps = query_latest_time_from_ps(ticid)
 
-        # replace pscomppars time items with ps ones
-        if not pd.isna(latest_ps["pl_orbper"]) and comp["pl_orbper"] != latest_ps["pl_orbper"]:
-            comp["pl_orbper"] = latest_ps["pl_orbper"]
+    rows = []
 
-        if not pd.isna(latest_ps["pl_tranmid"]) and comp["pl_tranmid"] != latest_ps["pl_tranmid"]:
-            comp["pl_tranmid"] = latest_ps["pl_tranmid"]
+    for _, comp in df_comps.iterrows():
 
-    # organise the structure of the output
-    final = comp[[
-       "pl_name", "hostname", "tic_id", 
-        "pl_orbper", "pl_tranmid", "pl_ratror", "pl_ratdor",
-        "pl_imppar", "pl_rade", "st_rad", "st_mass"
-       ]].to_frame().T
+        comp = comp.copy()
+        pl_name = comp["pl_name"]
+
+        # find the same planet in ps and replace its time term.
+        if df_ps is not None:
+            df_ps_p = df_ps[df_ps["pl_name"] == pl_name]
+
+            if len(df_ps_p) > 0:
+                latest_ps = df_ps_p.iloc[0]
+
+                for key in ["pl_orbper", "pl_tranmid"]:
+                    if key in latest_ps and not pd.isna(latest_ps[key]):
+                        comp[key] = latest_ps[key]
+
+        rows.append(comp)
+
+    # 3. organise output
+    final = pd.DataFrame(rows)[[
+        "pl_name", "hostname", "tic_id",
+        "pl_orbper", "pl_tranmid",
+        "pl_ratror", "pl_ratdor",
+        "pl_imppar", "pl_rade",
+        "st_rad", "st_mass"
+    ]]
 
     return final
 

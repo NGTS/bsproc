@@ -119,20 +119,19 @@ def predict_transit_curve(row, t_start, t_end):
     T4 = tc + dt
     return t, flux, tc, T1, T4
 
-def save_transit_csv(t, flux, tc, T1, T4, ticid, night, logger, outdir = None):
+def save_transit_csv(t, flux, tc, T1, T4, ticid, night, plname, actions_onen, logger, outdir = None):
     if outdir is None:
-        outdir = f"./bsproc_outputs/{ticid}/{night}"
+        outdir = f"./bsproc_outputs/{ticid}/{night}/models/{plname}"
         logger.info(f"[BMLC] No outdir provided, using default: {outdir}")
+    
     os.makedirs(outdir, exist_ok=True)
-    model_dir = os.path.join(outdir, "model")
-
-    os.makedirs(model_dir, exist_ok=True)
    
-    filename = os.path.join(model_dir, f"{ticid}_{night}_model.csv")
+    filename = os.path.join(outdir, f"{ticid}_{night}_{plname}_model.csv")
     with open(filename, "w") as f:
         # Comment header 
-        f.write(f"# TIC {ticid}, Night {night}\n")
+        f.write(f"# Hostname: TIC {ticid}, Night: {night}, Planet: {plname}\n")
         f.write(f"# Transit midtime (Tc) = {tc:.10f}\n")
+        f.write(f"# Actions: [{actions_onen}]\n")
         f.write(f"# T1 = {T1:.10f}\n") 
         f.write(f"# T4 = {T4:.10f}\n")
 
@@ -141,7 +140,15 @@ def save_transit_csv(t, flux, tc, T1, T4, ticid, night, logger, outdir = None):
 
         for ti, fi in zip(t, flux):
             f.write(f"{ti},{fi}\n")
-    return filename
+    return {
+    "night": night,
+    "planet": plname,
+    "file": filename,
+    "tc": tc,
+    "T1": T1,
+    "T4": T4,
+}
+
     
 def tranmodel(actionlist, ticid, nights, night_outdir_dict, logger= None):
     #1. call query and prepare parameters for Batman
@@ -151,29 +158,43 @@ def tranmodel(actionlist, ticid, nights, night_outdir_dict, logger= None):
         return None
     
     row = df.iloc[0]
-    results = []
-    model_files = []
-    for night in nights:
-        #2. Find the actionids for each night in actionlist
-        actions_onen= actionlist['action_id'][ actionlist['night'] == night ].to_numpy()
-        outdir = night_outdir_dict[night]
-        night = str(night)
-        # 3. from bspd : find_target_actions, actions have been searched,  
-        t_start, t_end = get_bjd_range(actions_onen, logger)
+    model_files = {}
+    for _, row in df.iterrows():
+        pl_name = row["pl_name"]
+        logger.info(f"[BMLC] Processing planet {pl_name}.")
+        for night in nights:
+            #2. Find the actionids for each night in actionlist
+            actions_onen= actionlist['action_id'][ actionlist['night'] == night ].to_numpy()
+            outdir = night_outdir_dict[night]
+            night = str(night)
+            # 3. from bspd : find_target_actions, actions have been searched,  
+            t_start, t_end = get_bjd_range(actions_onen, logger)
 
-        logger.info(f"FOR ACTION: {actions_onen} ----Start BJD: {t_start}, End BJD: {t_end}")
+            logger.info(f"For planet {pl_name}, For actions: {actions_onen} ----Start BJD: {t_start}, End BJD: {t_end}")
 
-        # 4. batman prediction
-        bjd, flux, tc, T1, T4 = predict_transit_curve(row, t_start, t_end)
+            # 4. batman prediction
+            bjd, flux, tc, T1, T4 = predict_transit_curve(row, t_start, t_end)
 
-        # 5. save output
-        model_dir = os.path.join(outdir, "model")
-        os.makedirs(model_dir, exist_ok=True)
-        model_files.append(save_transit_csv(bjd, flux, tc, T1, T4, ticid, night, logger, outdir))
-        logger.info(f"[BMLC] Saved predicted light curve for {ticid} on {night}")
-        
-        results.append((night, bjd, flux, tc, T1, T4))
+            # 5. save output
+            letter = pl_name.split()[-1]
+            host_name = row["hostname"]
+            plname = f"{host_name}_{letter}" 
+            model_dir = os.path.join(outdir, "models", plname)
+            os.makedirs(model_dir, exist_ok=True)
 
-    return results, model_files
+            model_file = save_transit_csv(
+                bjd, flux, tc, T1, T4,
+                ticid, night, plname, actions_onen, 
+                logger,
+                model_dir
+            )
+            if night not in model_files:
+                model_files[night] = {}
+
+            model_files[night][plname] = model_file
+
+            logger.info(f"[BMLC] Saved model for {ticid} {pl_name} on night {night}")
+
+    return model_files
 
 

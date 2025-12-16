@@ -126,7 +126,7 @@ if __name__ == "__main__":
   
     #if set --predict_model,then create a csv file including the batman model for the parameters queried from NASA Exoplanet Archive
     if args.predict_model:
-      BMmodel, model_file = tranmodel(actionlist, obj_ticid, observation_nights, night_outdir_dict, logger_main)
+      model_files = tranmodel(actionlist, obj_ticid, observation_nights, night_outdir_dict, logger_main)
     else:
       logger_main.info("[BMLC] --predict_model not set, skipping transit model generation.")
     # print(model_file)
@@ -159,5 +159,10 @@ if __name__ == "__main__":
     # After running the main process, the output file includes the obs lc ".dat" file
     #if setted model prediction, then the obs lc will plotted with the model created using NEA params in BATMAN.
     if args.predict_model:
-      moplot(logger_main, night_outdir_dict, obj_ticid, observation_nights, model_file)
+      moplot(logger_main, night_outdir_dict, obj_ticid, observation_nights, model_files)
+  
+    # After running the main process, the output file includes the obs lc ".dat" file
+    #if setted model prediction, then the obs lc will plotted with the model created using NEA params in BATMAN.
+    if args.predict_model:
+      moplot(logger_main, night_outdir_dict, obj_ticid, observation_nights, model_files)
   

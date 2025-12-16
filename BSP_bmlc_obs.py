@@ -13,10 +13,15 @@ def extract_title(obsfilename):
             if not line:
                 break
             header_lines.append(line.strip())
-        title_lines = [line.lstrip("#").strip() for line in header_lines[:4]]
-        title = "\n".join(title_lines)
-        title_lines = [line.lstrip("#").strip() for line in header_lines[:4]]
-        columns_line = header_lines[-1].lstrip("#").strip()
+    keep_idx = [0, 2, 3]
+    title_lines = [
+        header_lines[i].lstrip("#").strip()
+        for i in keep_idx
+        if i < len(header_lines)
+    ]
+        
+    title = "\n".join(title_lines)
+    columns_line = header_lines[-1].lstrip("#").strip()
     return title, columns_line
 
 
@@ -51,7 +56,12 @@ def plot_data(model, obs, op_name, bin_step=0.004):
         lines = f.readlines()
     #print(lines[:5])
 
-    for line in lines:
+    for i, line in enumerate(lines):
+        if not line.startswith("#"):
+            break   
+        if i == 0:
+            title1 = line.lstrip("#").strip()
+            continue
         if line.startswith("# Transit midtime"):
             Tc = float(line.split("=")[1])
 
@@ -60,12 +70,13 @@ def plot_data(model, obs, op_name, bin_step=0.004):
 
         if line.startswith("# T4"):
             T4 = float(line.split("=")[1])
-    # save model data to dataframe, skipping first 4 comment rows   
+        # save model data to dataframe, skipping first 4 comment rows   
     df1 = pd.read_csv(model, comment = "#")
 
     # Step2: Read observed data file 
     # Skip the last row which contains a note
-    title_text, column_name = extract_title(obs)
+    title, column_name = extract_title(obs)
+    title_text= f"{title}\n{title1}"
     colnames = column_name.split()
     df2 = pd.read_csv(obs, sep=r"\s+", comment="#", names=colnames)
 
@@ -129,14 +140,21 @@ def moplot_single(logger, outdir, ticid, night, model_file):
     This function works for a given night.
     Read model LC + obs LC, create plot directory, and call plot function. 
     """
-    # 1. Check model file
-    if not os.path.exists(model_file):
-        logger.error(f"[PLOT] Model file does not exist: {model_file}")
+    # 1. Unpack the model_file, which is a dict
+    plname = model_file["planet"]
+    model_csv = model_file["file"]
+    tc = model_file["tc"]
+    T1 = model_file["T1"]
+    T4 = model_file["T4"]
+
+    # 2. check the model_csv
+    if not os.path.exists(model_csv):
+        logger.error(f"[PLOT] Model file does not exist: {model_csv}")
         return
     else:
-        logger.info(f"[PLOT] Found model file: {model_file}")
+        logger.info(f"[PLOT] Found model file: {model_csv}")
 
-    # 2. Locate OBS LC file (obs is in parent directory of outdir)
+    # 3. Locate OBS LC file (obs is in parent directory of outdir)
     # delete the “/" first, the obs lc locates in analyses_outputs, without nightinfo.
     outdir = outdir.rstrip("/")
     obs_search_dir = os.path.dirname(outdir)
@@ -153,16 +171,16 @@ def moplot_single(logger, outdir, ticid, night, model_file):
     obs_file = obs_files[0]
     logger.info(f"[PLOT] Found obs LC: {obs_file}")
 
-    # 3. Create directory for saving model related results
+    # 4. Create directory for saving model-related results
     figure_dir = os.path.join(outdir, "model_plots")
     os.makedirs(figure_dir, exist_ok=True)
-    output_png = os.path.join(figure_dir, f"{ticid}_{night}_model_vs_obs.png")
+    output_png = os.path.join(figure_dir, f"{plname}_{night}_model_vs_obs.png")
     logger.info(f"[PLOT] Saving plot to: {figure_dir}")
 
-    # 4. Call plot function
+    # 5. Call plot function
     try:
         bin_step = 0.004
-        plot_data(model_file, obs_file, output_png, bin_step)
+        plot_data(model_csv, obs_file, output_png, bin_step)
         logger.info(f"[PLOT] Saved figure: {output_png}")
     except Exception as e:
         logger.error(f"[PLOT] Plotting failed for TIC {ticid} on night {night}: {e}")
@@ -181,16 +199,27 @@ def moplot(logger, night_outdir_dict, ticid, nights, model_files):
     # bsproc read nights instead of night, this function expand the single night plot to the multi-night one.
     if isinstance(nights, str):
         nights = [nights]
-    if isinstance(model_files, str):
-        model_files = [model_files]
+    for night in nights:
 
-    if len(nights) != len(model_files):
-        logger.error("[PLOT] nights and model_files length mismatch!")
-        return
+        if night not in night_outdir_dict:
+            logger.warning(f"[PLOT] Night {night} not found in night_outdir_dict, skipping.")
+            continue
 
-    for night, modelfile in zip(nights, model_files):
+        if night not in model_files:
+            logger.warning(f"[PLOT] No model files for night {night}, skipping.")
+            continue
 
         nightly_outdir = night_outdir_dict[night]
-
         logger.info(f"[PLOT] Processing night {night}, dir={nightly_outdir}")
-        moplot_single(logger, nightly_outdir, ticid, night, modelfile)
+
+        for plname, modelfile in model_files[night].items():
+
+            logger.info(f"[PLOT]   Plotting planet {plname}")
+
+            moplot_single(
+                logger,
+                nightly_outdir,
+                ticid,
+                night,
+                modelfile
+            )
