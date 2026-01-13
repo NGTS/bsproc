@@ -126,7 +126,7 @@ def save_transit_csv(t, flux, tc, T1, T4, ticid, night, plname, actions_onen, lo
     
     os.makedirs(outdir, exist_ok=True)
    
-    filename = os.path.join(outdir, f"{ticid}_{night}_{plname}_model.csv")
+    filename = os.path.join(outdir, f"TIC_{ticid}_{night}_{plname}_model.csv")
     with open(filename, "w") as f:
         # Comment header 
         f.write(f"# Hostname: TIC {ticid}, Night: {night}, Planet: {plname}\n")
@@ -175,23 +175,20 @@ def tranmodel(actionlist, ticid, nights, night_outdir_dict, logger= None):
             # 4. batman prediction
             bjd, flux, tc, T1, T4 = predict_transit_curve(row, t_start, t_end)
 
-            # 5. save output
-            letter = pl_name.split()[-1]
-            host_name = row["hostname"]
-            plname = f"{host_name}_{letter}" 
-            model_dir = os.path.join(outdir, "models", plname)
+            # 5. save output  
+            model_dir = os.path.join(outdir, "models", pl_name)
             os.makedirs(model_dir, exist_ok=True)
 
             model_file = save_transit_csv(
                 bjd, flux, tc, T1, T4,
-                ticid, night, plname, actions_onen, 
+                ticid, night, pl_name, actions_onen, 
                 logger,
                 model_dir
             )
             if night not in model_files:
                 model_files[night] = {}
 
-            model_files[night][plname] = model_file
+            model_files[night][pl_name] = model_file
 
             logger.info(f"[BMLC] Saved model for {ticid} {pl_name} on night {night}")
 

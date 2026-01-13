@@ -292,6 +292,7 @@ def infer_transit_params(row):
 
 
     return {
+
         "pl_orbper": P_tab,
         "pl_trandurh": T_tab,
         "pl_ratror": k,
@@ -492,6 +493,10 @@ def query_params_NEA(ticid):
                 combined[col] = inferred[col]
             else:
                 combined[col] = combined[col].combine_first(inferred[col])
+            
+        combined = combined.rename(columns={'toi': 'pl_name', 'tid': 'hostname'})
+        combined['pl_name'] = 'toi' + combined['pl_name'].astype(str)
+        combined['hostname'] = 'TIC ' + combined['hostname'].astype(str)
 
         print(f"Returning combined TOI + inferred parameters for TIC {ticid}:")
         print(combined)
