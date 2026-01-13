@@ -75,7 +75,7 @@ def get_ngpipe_bjd(ac_id,logger=None, ngpipe_op_dir = "/ngts/PAOPhot2/"):
     return target_bjd
 
 
-def predict_transit_curve(row, t_start, t_end):
+def predict_transit_curve(row, t_start, t_end,logger=None):
     """
     row: a single-row Series from NEA containing pl_orbper, pl_tranmid, pl_ratror, pl_ratdor, pl_imppar ...
     """
@@ -86,14 +86,20 @@ def predict_transit_curve(row, t_start, t_end):
     n = round((t_start - t0) / P)
     tc = t0 + n * P
 
+    # 2. assume or read the value of a/Rstar
+    if np.isnan(row['pl_ratdor']):
+        logger.info("[BMLC] There is no valid value for a/Rstar, The model will be established with an assumed value:10")
+        aRs = 10.0   # assume a value
+    else:
+        aRs = row['pl_ratdor']
+
     # 3. build Batman model based on tc
     params = batman.TransitParams()
     params.t0  = tc
     params.per = P
     params.rp  = row['pl_ratror']
-    params.a   = row['pl_ratdor']
+    params.a   = aRs
     b   = row['pl_imppar']
-    aRs = row['pl_ratdor']
     ratio = np.clip(b / aRs, -1, 1)       # avoid strange error in arccos funcion
     params.inc = np.degrees(np.arccos(ratio))
     params.ecc = 0
@@ -110,11 +116,13 @@ def predict_transit_curve(row, t_start, t_end):
     # Some of params may be nan,then T1,T4 will be returned as nan.
     k = row['pl_ratror']      # Rp/R*
     inc1 = np.radians(params.inc)   # radians
-    if np.all(~np.isnan([P, aRs, k, b, inc1])):
+    if "pl_trandur" in row and not np.isnan(row["pl_trandur"]):
+        T14 = row["pl_trandur"] / 24.0
+    elif np.all(~np.isnan([P, aRs, k, b, inc1])):
         T14 = (P/np.pi) * np.arcsin((1/aRs) * np.sqrt((1 + k)**2 - b**2) / np.sin(inc1))
     else:
         return t, flux, tc, None, None
-    dt = T14 / 2.
+    dt = T14 / 2
     T1 = tc - dt
     T4 = tc + dt
     return t, flux, tc, T1, T4
@@ -130,10 +138,10 @@ def save_transit_csv(t, flux, tc, T1, T4, ticid, night, plname, actions_onen, lo
     with open(filename, "w") as f:
         # Comment header 
         f.write(f"# Hostname: TIC {ticid}, Night: {night}, Planet: {plname}\n")
-        f.write(f"# Transit midtime (Tc) = {tc:.10f}\n")
+        f.write(f"# Transit midtime (Tc) = {tc}\n")
         f.write(f"# Actions: [{actions_onen}]\n")
-        f.write(f"# T1 = {T1:.10f}\n") 
-        f.write(f"# T4 = {T4:.10f}\n")
+        f.write(f"# T1 = {T1}\n") 
+        f.write(f"# T4 = {T4}\n")
 
         # Column header
         f.write("BJD,Flux\n")
@@ -173,7 +181,7 @@ def tranmodel(actionlist, ticid, nights, night_outdir_dict, logger= None):
             logger.info(f"For planet {pl_name}, For actions: {actions_onen} ----Start BJD: {t_start}, End BJD: {t_end}")
 
             # 4. batman prediction
-            bjd, flux, tc, T1, T4 = predict_transit_curve(row, t_start, t_end)
+            bjd, flux, tc, T1, T4 = predict_transit_curve(row, t_start, t_end, logger)
 
             # 5. save output  
             model_dir = os.path.join(outdir, "models", pl_name)
@@ -195,3 +203,46 @@ def tranmodel(actionlist, ticid, nights, night_outdir_dict, logger= None):
     return model_files
 
 
+def forcemodel(actionlist, ticid, nights, night_outdir_dict, logger= None):
+    #1. call query and prepare parameters for Batman
+    df = QNEA.get_ephem_from_tess_portal(ticid)
+    if df is None or len(df) == 0:
+        logger.error(f"No  parameters found in TESS_portal.ephems for TIC {ticid}")
+        return None
+    
+    row = df.iloc[0]
+    model_files = {}
+    for _, row in df.iterrows():
+        pl_name = row["pl_name"]
+        logger.info(f"[BMLC] Processing planet {pl_name}.")
+        for night in nights:
+            #2. Find the actionids for each night in actionlist
+            actions_onen= actionlist['action_id'][ actionlist['night'] == night ].to_numpy()
+            outdir = night_outdir_dict[night]
+            night = str(night)
+            # 3. from bspd : find_target_actions, actions have been searched,  
+            t_start, t_end = get_bjd_range(actions_onen, logger)
+
+            logger.info(f"For planet {pl_name}, For actions: {actions_onen} ----Start BJD: {t_start}, End BJD: {t_end}")
+
+            # 4. batman prediction
+            bjd, flux, tc, T1, T4 = predict_transit_curve(row, t_start, t_end)
+
+            # 5. save output  
+            model_dir = os.path.join(outdir, "models", pl_name)
+            os.makedirs(model_dir, exist_ok=True)
+
+            model_file = save_transit_csv(
+                bjd, flux, tc, T1, T4,
+                ticid, night, pl_name, actions_onen, 
+                logger,
+                model_dir
+            )
+            if night not in model_files:
+                model_files[night] = {}
+
+            model_files[night][pl_name] = model_file
+
+            logger.info(f"[BMLC] Saved model for {ticid} {pl_name} on night {night}")
+
+    return model_files

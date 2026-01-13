@@ -146,6 +146,7 @@ def moplot_single(logger, outdir, ticid, night, model_file):
     tc = model_file["tc"]
     T1 = model_file["T1"]
     T4 = model_file["T4"]
+    
 
     # 2. check the model_csv
     if not os.path.exists(model_csv):
@@ -214,7 +215,7 @@ def moplot(logger, night_outdir_dict, ticid, nights, model_files):
 
         for plname, modelfile in model_files[night].items():
 
-            logger.info(f"[PLOT]   Plotting planet {plname}")
+            logger.info(f"[PLOT] Plotting planet {plname}")
 
             moplot_single(
                 logger,

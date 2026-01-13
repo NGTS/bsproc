@@ -3,6 +3,8 @@
 import numpy as np
 import pandas as pd
 import requests
+import pymysql
+import pymysql.cursors
 import io
 
 G_cgs      = 6.67430e-8
@@ -315,7 +317,7 @@ def query_params_from_pscomppars(ticid):
     url = "https://exoplanetarchive.ipac.caltech.edu/TAP/sync"
     qry = (
         "SELECT pl_name, hostname, tic_id, pl_orbper, pl_tranmid, pl_ratror, pl_ratdor, "
-        "pl_imppar, pl_rade, st_rad, st_mass "
+        "pl_imppar, pl_rade, pl_orbeccen,  pl_trandur, st_rad, st_mass "
         "FROM pscomppars "
         f"WHERE tic_id LIKE '%{ticid}%'"
     )
@@ -440,6 +442,7 @@ def get_best_params(ticid):
         "pl_orbper", "pl_tranmid",
         "pl_ratror", "pl_ratdor",
         "pl_imppar", "pl_rade",
+        "pl_orbeccen", "pl_trandur", 
         "st_rad", "st_mass"
     ]]
 
@@ -512,3 +515,48 @@ def query_params_NEA(ticid):
 #df = query_params_from_toi("211446495")
 #query_params_NEA("276754403")
 # print(df.columns)
+
+
+def get_ephem_from_tess_portal(tic_id):
+
+    qry = """
+    SELECT tic_id, t_zero, period, radius_1, k, b, e, w
+    FROM tess_portal.ephem
+    WHERE tic_id = %s
+    """
+
+    connection = pymysql.connect(
+        host='ngtsdb',
+        user='pipe',
+        cursorclass=pymysql.cursors.DictCursor
+    )
+
+    with connection.cursor() as cur:
+        cur.execute(qry, (tic_id,))
+        rows = cur.fetchall()
+
+    connection.close()
+
+    if len(rows) == 0:
+        return pd.DataFrame()
+
+    df = pd.DataFrame(rows)
+
+    df = df.rename(columns={
+        'tic_id': 'tic_id',
+        't_zero': 'pl_tranmid',
+        'period': 'pl_orbper',
+        'radius_1': 'pl_ratdor',
+        'k': 'pl_ratror',
+        'b': 'pl_imppar',
+        'e': 'pl_orbeccen',
+        'w': 'omega'
+    })
+
+    df.insert(0, 'pl_name',  'TIC ' + df['tic_id'].astype(str))
+    df.insert(1, 'hostname', 'TIC ' + df['tic_id'].astype(str))
+    print(f"Returning parameters found in TESS_portal.ephems for TIC {tic_id}: ")
+    print("----------------------------------------------------------------------------------------")
+    print(df)
+    print("----------------------------------------------------------------------------------------")
+    return df
