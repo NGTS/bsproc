@@ -131,17 +131,13 @@ if __name__ == "__main__":
       model_files = tranmodel(actionlist, obj_ticid, observation_nights, night_outdir_dict, logger_main)
     else:
       logger_main.info("[BMLC] --predict_model not set, skipping transit model generation.")
-   
+
     #If set --force_model,then create a csv file saving the batman model for parameters input by uses on TESS portal
     if args.force_model:
       model_files = forcemodel(actionlist, obj_ticid, observation_nights, night_outdir_dict, logger_main)
     else:
       logger_main.info("[BMLC] --force_model not set, skipping transit model generation.")
-
-    #if setted force_model prediction,then the obs lc will plotted with the model created using ephemeris input in TESS portal.
-    if args.force_model:
-      moplot(logger_main, night_outdir_dict, obj_ticid, observation_nights, model_files)
-
+    
     # print(model_file)  
 
     # This function call runs the main BSP process.
