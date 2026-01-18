@@ -87,15 +87,15 @@ def plot_data(model, obs, op_name, bin_step=0.004):
     # Step3.5: we cut the obs to the night in predicted model
     time0 = df1["BJD"].iloc[0]
     time1 = df1["BJD"].iloc[-1]
+
     margin = 0.1 # days, enough to constrain the obs_lc for one night.
     mask_night = (df2['BJD'] >= (time0 - margin)) & (df2['BJD'] <= (time1+ margin))
     mask_obs = mask_good & mask_night
 
-
     obsflux = df2['FluxNorm'][mask_obs]
     obsbjd  = df2['BJD'][mask_obs]
     obsfluxerr = df2['FluxNormErr'][mask_obs]
-
+  
     # Step4: Merge duplicate time points
     time, flux, fluxerr = merge_duplicates(obsbjd, obsflux, obsfluxerr)
 
@@ -146,7 +146,6 @@ def moplot_single(logger, outdir, ticid, night, model_file):
     tc = model_file["tc"]
     T1 = model_file["T1"]
     T4 = model_file["T4"]
-    
 
     # 2. check the model_csv
     if not os.path.exists(model_csv):
@@ -160,7 +159,7 @@ def moplot_single(logger, outdir, ticid, night, model_file):
     outdir = outdir.rstrip("/")
     obs_search_dir = os.path.dirname(outdir)
     logger.info(f"[PLOT] Searching obs LC in: {obs_search_dir}")
-    obs_pattern = os.path.join(obs_search_dir, "*master_apers_bsproc_lc.dat")
+    obs_pattern = os.path.join(obs_search_dir,  f"*{night}*master_apers_bsproc_lc.dat")
     obs_files = glob.glob(obs_pattern)
 
     if len(obs_files) == 0:
@@ -183,11 +182,12 @@ def moplot_single(logger, outdir, ticid, night, model_file):
         bin_step = 0.004
         plot_data(model_csv, obs_file, output_png, bin_step)
         logger.info(f"[PLOT] Saved figure: {output_png}")
+        logger.info("[PLOT] Plotting completed.")
+
     except Exception as e:
         logger.error(f"[PLOT] Plotting failed for TIC {ticid} on night {night}: {e}")
 
-    logger.info("[PLOT] Plotting completed.")
-
+   
 # Example usage:
 #modelfile= "/Users/urnotlizzy/Downloads/139528693_2025-11-11_model.csv"
 #obsfilefile= "/Users/urnotlizzy/Downloads/NGTS_TIC-139528693_2025-11-10_2025-11-11_2025-11-12.txt"
@@ -201,7 +201,6 @@ def moplot(logger, night_outdir_dict, ticid, nights, model_files):
     if isinstance(nights, str):
         nights = [nights]
     for night in nights:
-
         if night not in night_outdir_dict:
             logger.warning(f"[PLOT] Night {night} not found in night_outdir_dict, skipping.")
             continue

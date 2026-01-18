@@ -7,13 +7,13 @@ Run the NGTS BSP pipeline
 
 @author: Edward M. Bryant
 """
-
+import sys
 import numpy as np
 import argparse as ap
 import BSP_utils as bspu
 import BSP_db as bspd
 import BSP_phot as bspp
-from bmlc_nea import tranmodel, forcemodel
+from bmlc_nea import tranmodel, forcemodel, collect_model
 from  BSP_bmlc_obs import moplot
 
 def ParseArgs():
@@ -59,10 +59,10 @@ def ParseArgs():
                         help='Exposure time of observations')
     parser.add_argument('--force_new_csv', action='store_true',
                         help='Provide this to force a new phot csv file to be created. WARNING - any existing BSP output files will be overwritten')
-    parser.add_argument('--predict_model', action='store_true',
-                        help='If set, query NEA parameters and generate a predicted transit light curve using batman. OPTIONAl. A csv file and A plot fitting observations will be saved.')
-    parser.add_argument('--force_model', action='store_true',
-                        help='if set, the parameters manually input in the TESS portal will be used to create a predicted transit model. OPTIONAL. ')
+    parser.add_argument('--plot_only',choices=['nea', 'ephem', 'file'],
+                        help= 'If set, only plot the model and observations from the specified source. Model and observation light curves must already exist.')
+    parser.add_argument('--model',choices=['nea', 'ephem', 'file'],
+                        help='Create transit model, and plot the model with obs. OPTIONAL. If used must also provide model source:"nea", "ephem", "file"')         
     return parser.parse_args()
 
 if __name__ == "__main__":
@@ -126,19 +126,28 @@ if __name__ == "__main__":
     # logger_main, obj_ticid = bspd.get_target_tic_id(logger_main, object_name)
     obj_ticid = args.tic_id
   
-    #If set --predict_model,then create a csv file including the batman model for the parameters queried from NASA Exoplanet Archive
-    if args.predict_model:
-      model_files = tranmodel(actionlist, obj_ticid, observation_nights, night_outdir_dict, logger_main)
-    else:
-      logger_main.info("[BMLC] --predict_model not set, skipping transit model generation.")
+    # If set --model, the source will be used to search parameters for creating Batman transit model.
+    if args.model:
+      if args.model == 'nea':
+        logger_main.info("[BMLC] Generating transit model from NEA parameters...")
+        model_files = tranmodel(actionlist, obj_ticid, observation_nights, night_outdir_dict, logger_main)
 
-    #If set --force_model,then create a csv file saving the batman model for parameters input by uses on TESS portal
-    if args.force_model:
-      model_files = forcemodel(actionlist, obj_ticid, observation_nights, night_outdir_dict, logger_main)
+      elif args.model == 'ephem':
+        logger_main.info("[BMLC] Generating transit model from ephemeris parameters...")
+        model_files = forcemodel(actionlist, obj_ticid, observation_nights, night_outdir_dict, logger_main)
+
+      elif args.model == 'file':
+        logger_main.info("[BMLC] Model source set to 'file'. Functionality not yet implemented.")
+        model_files = {} # TBC
+
     else:
-      logger_main.info("[BMLC] --force_model not set, skipping transit model generation.")
-    
-    # print(model_file)  
+      logger_main.info("[BMLC] --model not set, skipping transit model generation.")
+
+    if args.plot_only:
+      model_files = collect_model(actionlist, obj_ticid, observation_nights, night_outdir_dict, source=args.plot_only, logger = logger_main)
+      moplot(logger_main, night_outdir_dict, obj_ticid, observation_nights, model_files)
+      logger_main.info(f"Plot-only mode: Transit models  from '{args.plot_only}' and observations have been plotted.")
+      sys.exit(0)
 
     # This function call runs the main BSP process.
     # This process includes - 
@@ -165,13 +174,8 @@ if __name__ == "__main__":
         observation_nights, object_name, obj_ticid, args, outdir_main
         )
 
-    # After running the main process, the output file includes the obs lc ".dat" file
-    #if setted model prediction, then the obs lc will plotted with the model created using NEA params in BATMAN.
-    if args.predict_model:
-      moplot(logger_main, night_outdir_dict, obj_ticid, observation_nights, model_files)
-    
-    #if setted force_model prediction,then the obs lc will plotted with the model created using ephemeris input in TESS portal.
-    if args.force_model:
-      moplot(logger_main, night_outdir_dict, obj_ticid, observation_nights, model_files)
-  
+    if model_files:
+        moplot(logger_main, night_outdir_dict, obj_ticid, observation_nights, model_files)
+        logger_main.info("[BMLC] Completed plotting of models and observations.")
+      
   

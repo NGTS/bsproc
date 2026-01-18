@@ -2,6 +2,7 @@ import batman
 import numpy as np
 import QueryNEA as QNEA
 import os
+import glob
 import astropy.io.fits as pyfits
 
 def get_bjd_range(actions,logger):
@@ -82,7 +83,12 @@ def predict_transit_curve(row, t_start, t_end,logger=None):
 
     # 1. closest tc = t0 + nP
     P = row['pl_orbper']
-    t0 = row['pl_tranmid']
+    if np.isnan(row['pl_tranmid']):
+        logger.info("[BMLC] There is no valid transit midtime, The model will be established assuming the midtime of obs it the tranmid.")
+        t0 = (t_start + t_end)/2
+    else:
+        t0 = row['pl_tranmid']
+    
     n = round((t_start - t0) / P)
     tc = t0 + n * P
 
@@ -244,5 +250,27 @@ def forcemodel(actionlist, ticid, nights, night_outdir_dict, logger= None):
             model_files[night][pl_name] = model_file
 
             logger.info(f"[BMLC] Saved model for {ticid} {pl_name} on night {night}")
+
+    return model_files
+
+def collect_model(actionlist, ticid, nights, night_outdir_dict, source=None, logger=None):
+    """
+    Collect or generate model files for plotting.
+    For now, only 'nea' and 'ephem' sources are supported.
+    """
+    if source == 'nea':
+        if logger:
+            logger.info(f"[PLOT] Collecting model files from NEA source for TIC {ticid}")
+        model_files = tranmodel(actionlist, ticid, nights, night_outdir_dict, logger)
+    
+    elif source == 'ephem':
+        if logger:
+            logger.info(f"[PLOT] Collecting model files from Ephemeris source for TIC {ticid}")
+        model_files = forcemodel(actionlist, ticid, nights, night_outdir_dict, logger)
+    
+    else:
+        if logger:
+            logger.warning(f"[PLOT] Source '{source}' not yet implemented. Returning empty dict.")
+        model_files = {}  ## TBC
 
     return model_files
