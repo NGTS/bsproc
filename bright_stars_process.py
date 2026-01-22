@@ -146,7 +146,6 @@ if __name__ == "__main__":
     if args.plot_only:
       model_files = collect_model(actionlist, obj_ticid, observation_nights, night_outdir_dict, source=args.plot_only, logger = logger_main)
       moplot(logger_main, night_outdir_dict, obj_ticid, observation_nights, model_files)
-      logger_main.info(f"Plot-only mode: Transit models  from '{args.plot_only}' and observations have been plotted.")
       sys.exit(0)
 
     # This function call runs the main BSP process.
@@ -176,6 +175,6 @@ if __name__ == "__main__":
 
     if model_files:
         moplot(logger_main, night_outdir_dict, obj_ticid, observation_nights, model_files)
-        logger_main.info("[BMLC] Completed plotting of models and observations.")
+        
       
   

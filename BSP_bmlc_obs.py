@@ -162,14 +162,14 @@ def moplot_single(logger, outdir, ticid, night, model_file):
     obs_pattern = os.path.join(obs_search_dir,  f"*{night}*master_apers_bsproc_lc.dat")
     obs_files = glob.glob(obs_pattern)
 
-    if len(obs_files) == 0:
-        logger.error(f"[PLOT] No obs LC found in: {outdir}")
+    if not obs_files:
+        logger.error(f"[PLOT] No obs LC found in: {obs_search_dir}")
         return
-    elif len(obs_files) > 1:
-        logger.warning(f"[PLOT] Multiple obs LC found, using first: {obs_files[0]}")
 
-    obs_file = obs_files[0]
-    logger.info(f"[PLOT] Found obs LC: {obs_file}")
+    obs_file = max(obs_files, key=os.path.getmtime)
+    if len(obs_files) > 1:
+        logger.warning(f"[PLOT] Multiple obs LC found ({len(obs_files)}), using latest one")
+    logger.info(f"[PLOT] Using obs LC: {obs_file}")
 
     # 4. Create directory for saving model-related results
     figure_dir = os.path.join(outdir, "model_plots")

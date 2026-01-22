@@ -75,63 +75,101 @@ def get_ngpipe_bjd(ac_id,logger=None, ngpipe_op_dir = "/ngts/PAOPhot2/"):
     target_bjd = np.copy(bjds[0])[keep]
     return target_bjd
 
+def predict_transit_curve(row, t_start, t_end, logger=None):
+    # 0. read the parameters out and set as nan if not exist.
+    def get_val(key, default=np.nan):
+        return row.get(key, default) if not np.isnan(row.get(key, default)) else default
 
-def predict_transit_curve(row, t_start, t_end,logger=None):
-    """
-    row: a single-row Series from NEA containing pl_orbper, pl_tranmid, pl_ratror, pl_ratdor, pl_imppar ...
-    """
-
-    # 1. closest tc = t0 + nP
-    P = row['pl_orbper']
-    if np.isnan(row['pl_tranmid']):
-        logger.info("[BMLC] There is no valid transit midtime, The model will be established assuming the midtime of obs it the tranmid.")
-        t0 = (t_start + t_end)/2
-    else:
-        t0 = row['pl_tranmid']
+    P = get_val('pl_orbper')        
+    t0_data = get_val('pl_tranmid') 
+    k = get_val('pl_ratror', 0.1)   # Rp/Rs，default is 0.1
+    b = get_val('pl_imppar', 0.0)   # impact parameter, default is 0.0
+    w = get_val('pl_orblper', 90.0)  # argument of periastron
+    # stellar parameters
+    m_star = get_val('st_mass')     # unit: solar mass
+    r_star = get_val('st_rad')      # unit: solar radius
     
+    # dealing with t0
+    if np.isnan(t0_data):
+        if logger: logger.warning("[BMLC] No effective 'pl_tranmid', using the observational midtime as t0")
+        t0 = (t_start + t_end) / 2
+    else:
+        t0 = t0_data
+
+    # 1. calculate closest tc = t0 + nP
+    # n is the closest epoch to obs
     n = round((t_start - t0) / P)
     tc = t0 + n * P
 
-    # 2. assume or read the value of a/Rstar
-    if np.isnan(row['pl_ratdor']):
-        logger.info("[BMLC] There is no valid value for a/Rstar, The model will be established with an assumed value:10")
-        aRs = 10.0   # assume a value
-    else:
-        aRs = row['pl_ratdor']
+    # 2. derive aRs, the priority: 
+    #a. read from "pl_ratdor"; 
+    #b. calculate with m_star, s_star using Kepler 3rd law; 
+    #c. calculate with known tran_duration time (this may be better than b? deserves more consideration)
+	#d. set a default value for it to keep the model generating code running.
+    aRs = np.nan
+    # a.
+    aRs = get_val('pl_ratdor')
+    # c.
+    if np.isnan(aRs) and not np.isnan(get_val('pl_trandur')):
+        dur = row['pl_trandur'] / 24.0 # hours to days
+        try:
+            #sin(delta_phi) = sqrt((1+k)^2 - b^2) / (aRs * sin(i))
+            sin_term = np.sin(dur * np.pi / P)
+            sin_term = np.clip(np.sin(dur * np.pi / P), 1e-6, 1.0)
+            aRs = np.sqrt(((1 + k)**2 - b**2) / sin_term**2 + b**2)
+            if logger: logger.info(f"[BMLC] transit duration deriving a/R*: {aRs:.2f}")
+        except:
+            pass
 
-    # 3. build Batman model based on tc
+    # b.
+    if np.isnan(aRs) and not np.isnan(m_star) and not np.isnan(r_star):
+        # a/Rs = [ (G * M_sun * P^2) / (4 * pi^2) ]^(1/3) / (R_sun * r_star)
+        # a/Rs = 4.205 * (m_star)^(1/3) * (P_days)^(2/3) / r_star
+        aRs = 4.205 * (m_star**(1/3)) * (P**(2/3)) / r_star
+        if logger: logger.info(f"[BMLC] Kepler 3rd law deriving a/R*: {aRs:.2f}")
+
+    # d.
+    if np.isnan(aRs):
+        aRs = 50.0
+        if logger: logger.warning("[BMLC] Cannot derive a/Rs, using default value: 50")
+
+    # 3. calculate the inclination
+    # b = aRs * cos(i)
+    cos_i = np.clip(b / aRs, 0, 1.0)
+    inc_deg = np.degrees(np.arccos(cos_i))
+    incl = np.radians(inc_deg)
+
+    # 4. build Batman model based on tc
     params = batman.TransitParams()
     params.t0  = tc
     params.per = P
-    params.rp  = row['pl_ratror']
+    params.rp  = k
     params.a   = aRs
-    b   = row['pl_imppar']
-    ratio = np.clip(b / aRs, -1, 1)       # avoid strange error in arccos funcion
-    params.inc = np.degrees(np.arccos(ratio))
-    params.ecc = 0
-    params.w   = 90
-    params.u   = [0.1, 0.3]
+    params.inc = inc_deg
+    params.ecc = get_val('pl_orbeccen', 0.0)
+    params.w   = w 
+    params.u   = [0.1, 0.3] 
     params.limb_dark = "quadratic"
-
-    # 4. calculate the theoretical model
+		
     t = np.linspace(t_start, t_end, 1000)
     m = batman.TransitModel(params, t)
     flux = m.light_curve(params)
     
-    # 5. calculate transit duration for reference: P,aRS,k,b,inc
-    # Some of params may be nan,then T1,T4 will be returned as nan.
-    k = row['pl_ratror']      # Rp/R*
-    inc1 = np.radians(params.inc)   # radians
-    if "pl_trandur" in row and not np.isnan(row["pl_trandur"]):
-        T14 = row["pl_trandur"] / 24.0
-    elif np.all(~np.isnan([P, aRs, k, b, inc1])):
-        T14 = (P/np.pi) * np.arcsin((1/aRs) * np.sqrt((1 + k)**2 - b**2) / np.sin(inc1))
-    else:
-        return t, flux, tc, None, None
-    dt = T14 / 2
-    T1 = tc - dt
-    T4 = tc + dt
-    return t, flux, tc, T1, T4
+    # calculate transit duration using the model in_transit time, or read the archive duration
+    # Some of params may be nan,then T1,T4 will be returned as nan. 
+    try:
+        sin_i = np.sin(incl)
+        inner_val = (1.0/aRs) * np.sqrt((1 + k)**2 - b**2) / sin_i
+        inner_val = np.clip(inner_val, -1, 1) 
+        T14 = (P / np.pi) * np.arcsin(inner_val)
+        if not np.isnan(T14): logger.info(f"[BMLC]calcating T14 = {T14}")
+    except:
+        T14 = get_val('pl_trandur', default)
+        if not np.isnan(T14):
+            T14 /= 24.0  # hours to days
+            logger.info(f"[BMLC]The T14 = {T14} coming from the transit duration value in archive.")
+    dt = T14 / 2 
+    return t, flux, tc, tc - dt, tc + dt
 
 def save_transit_csv(t, flux, tc, T1, T4, ticid, night, plname, actions_onen, logger, outdir = None):
     if outdir is None:
@@ -162,7 +200,6 @@ def save_transit_csv(t, flux, tc, T1, T4, ticid, night, plname, actions_onen, lo
     "T1": T1,
     "T4": T4,
 }
-
     
 def tranmodel(actionlist, ticid, nights, night_outdir_dict, logger= None):
     #1. call query and prepare parameters for Batman

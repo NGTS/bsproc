@@ -317,9 +317,9 @@ def query_params_from_pscomppars(ticid):
     url = "https://exoplanetarchive.ipac.caltech.edu/TAP/sync"
     qry = (
         "SELECT pl_name, hostname, tic_id, pl_orbper, pl_tranmid, pl_ratror, pl_ratdor, "
-        "pl_imppar, pl_rade, pl_orbeccen,  pl_trandur, st_rad, st_mass "
+        "pl_imppar, pl_rade, pl_orbeccen,  pl_trandur, pl_orblper, st_rad, st_mass "
         "FROM pscomppars "
-        f"WHERE tic_id LIKE '%{ticid}%'"
+        f"WHERE tic_id LIKE '%{ticid}%' AND tran_flag =1"
     )
 
     params = {
@@ -355,7 +355,7 @@ def query_params_from_toi(ticid):
         "st_tmag, st_rad, st_logg "
         #"SELECT TOP 5 * "
         "FROM toi "
-        f"WHERE tid = {ticid}" 
+        f"WHERE tid = {ticid} AND tran_flag=1" 
     )
     params = {
         "query": qry,
@@ -442,7 +442,7 @@ def get_best_params(ticid):
         "pl_orbper", "pl_tranmid",
         "pl_ratror", "pl_ratdor",
         "pl_imppar", "pl_rade",
-        "pl_orbeccen", "pl_trandur", 
+        "pl_orbeccen", "pl_trandur","pl_orblper",
         "st_rad", "st_mass"
     ]]
 
