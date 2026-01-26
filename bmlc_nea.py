@@ -157,17 +157,19 @@ def predict_transit_curve(row, t_start, t_end, logger=None):
     
     # calculate transit duration using the model in_transit time, or read the archive duration
     # Some of params may be nan,then T1,T4 will be returned as nan. 
-    try:
+       
+    T14 = get_val('pl_trandur')
+    if not np.isnan(T14):
+        T14 /= 24.0  # hours to days
+        logger.info(f"[BMLC]The T14 = {T14} coming from the transit duration value in archive.")
+
+    else:
         sin_i = np.sin(incl)
         inner_val = (1.0/aRs) * np.sqrt((1 + k)**2 - b**2) / sin_i
         inner_val = np.clip(inner_val, -1, 1) 
         T14 = (P / np.pi) * np.arcsin(inner_val)
         if not np.isnan(T14): logger.info(f"[BMLC]calcating T14 = {T14}")
-    except:
-        T14 = get_val('pl_trandur', default)
-        if not np.isnan(T14):
-            T14 /= 24.0  # hours to days
-            logger.info(f"[BMLC]The T14 = {T14} coming from the transit duration value in archive.")
+
     dt = T14 / 2 
     return t, flux, tc, tc - dt, tc + dt
 

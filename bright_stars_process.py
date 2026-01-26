@@ -125,7 +125,7 @@ if __name__ == "__main__":
     #      HardCoded values for other names - ToDo: implement Sam's SIMBAD querying    
     # logger_main, obj_ticid = bspd.get_target_tic_id(logger_main, object_name)
     obj_ticid = args.tic_id
-  
+    model_files = {}
     # If set --model, the source will be used to search parameters for creating Batman transit model.
     if args.model:
       if args.model == 'nea':
