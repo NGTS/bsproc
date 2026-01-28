@@ -560,3 +560,37 @@ def get_ephem_from_tess_portal(tic_id):
     print(df)
     print("----------------------------------------------------------------------------------------")
     return df
+
+
+def get_ephem_from_files(tic_id):
+    file_path = "ephem_file.dat"
+    df_all = pd.read_csv(file_path, delim_whitespace=True, comment='#')
+    try:
+        df = df_all[df_all['tic_id'] == tic_id]
+    except Exception as e:
+        print(f"Cannot read the ephem_file: {e}.")
+        return pd.DataFrame() 
+    
+    if df.empty:
+        return pd.DataFrame()
+
+    df = df.rename(columns={
+        'tic_id': 'tic_id',
+        'pl_name': "pl_name",
+        't_zero': 'pl_tranmid',
+        'period': 'pl_orbper',
+        'aRs': 'ratdor',
+        'k': 'pl_ratror',
+        'b': 'pl_imppar',
+        'e': 'pl_orbeccen',
+        'w': 'omega'
+    })
+
+    df.insert(0, 'hostname', 'TIC ' + df['tic_id'].astype(str))
+
+    print(f"Returning parameters found in {file_path} for TIC {tic_id}: ")
+    print("----------------------------------------------------------------------------------------")
+    print(df)
+    print("----------------------------------------------------------------------------------------")
+
+    return df

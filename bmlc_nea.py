@@ -252,7 +252,7 @@ def forcemodel(actionlist, ticid, nights, night_outdir_dict, logger= None):
     #1. call query and prepare parameters for Batman
     df = QNEA.get_ephem_from_tess_portal(ticid)
     if df is None or len(df) == 0:
-        logger.error(f"No  parameters found in TESS_portal.ephems for TIC {ticid}")
+        logger.error(f"No parameters found in TESS_portal.ephems for TIC {ticid}")
         return None
     
     row = df.iloc[0]
@@ -292,6 +292,51 @@ def forcemodel(actionlist, ticid, nights, night_outdir_dict, logger= None):
 
     return model_files
 
+def filemodel(actionlist, ticid, nights, night_outdir_dict, logger= None):
+    #1. call query and prepare parameters for Batman
+    df = QNEA.get_ephem_from_files(ticid)
+    if df is None or len(df) == 0:
+        logger.error(f"No parameters found in ephem_file for TIC {ticid}")
+        return None
+    
+    row = df.iloc[0]
+    model_files = {}
+    for _, row in df.iterrows():
+        pl_name = row["pl_name"]
+        logger.info(f"[BMLC] Processing planet {pl_name}.")
+        for night in nights:
+            #2. Find the actionids for each night in actionlist
+            actions_onen= actionlist['action_id'][ actionlist['night'] == night ].to_numpy()
+            outdir = night_outdir_dict[night]
+            night = str(night)
+            # 3. from bspd : find_target_actions, actions have been searched,  
+            t_start, t_end = get_bjd_range(actions_onen, logger)
+
+            logger.info(f"For planet {pl_name}, For actions: {actions_onen} ----Start BJD: {t_start}, End BJD: {t_end}")
+
+            # 4. batman prediction
+            bjd, flux, tc, T1, T4 = predict_transit_curve(row, t_start, t_end, logger)
+
+            # 5. save output  
+            model_dir = os.path.join(outdir, "models", pl_name)
+            os.makedirs(model_dir, exist_ok=True)
+
+            model_file = save_transit_csv(
+                bjd, flux, tc, T1, T4,
+                ticid, night, pl_name, actions_onen, 
+                logger,
+                model_dir
+            )
+            if night not in model_files:
+                model_files[night] = {}
+
+            model_files[night][pl_name] = model_file
+
+            logger.info(f"[BMLC] Saved model for {ticid} {pl_name} on night {night}")
+
+    return model_files
+
+
 def collect_model(actionlist, ticid, nights, night_outdir_dict, source=None, logger=None):
     """
     Collect or generate model files for plotting.
@@ -307,9 +352,15 @@ def collect_model(actionlist, ticid, nights, night_outdir_dict, source=None, log
             logger.info(f"[PLOT] Collecting model files from Ephemeris source for TIC {ticid}")
         model_files = forcemodel(actionlist, ticid, nights, night_outdir_dict, logger)
     
+    elif source == 'file':
+        if logger:
+            logger.warning(f"[PLOT] Collecting model files from ephem_file.dat for TIC {ticid}")
+        model_files = filemodel(actionlist, ticid, nights, night_outdir_dict, logger)
+    
     else:
         if logger:
-            logger.warning(f"[PLOT] Source '{source}' not yet implemented. Returning empty dict.")
-        model_files = {}  ## TBC
+            logger.error('No sources provided. Please set one model source behind "--plot_only": "nea", "ephem", "file"')
 
     return model_files
+
+

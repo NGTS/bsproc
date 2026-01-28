@@ -1,0 +1,17 @@
+## Column Description:
+## tic_id: The TIC ID of the host star. Only numbers are needed. e.g. <276754403>
+## pl_name: The planet name or some names will be used to identify different ephemeris rows for the same host star. e.g. <planet-b> <test1> <toi-199b>
+## t_zero: Epoch (BJD). e.g.<2457098.6348>
+## period: Orbital period in days. e.g. <87.2467>
+## aRs: a/R_s, Oribtal seperation in units of stellar radii.  e.g. <75>
+## k: R_p/R_s, Radius ratio (planet / star). e.g. <0.101>
+## b: impact parameter(0 = central transit, 1 = grazing). e.g. <0.2>
+## e: Orbital eccentricity (0 = circular). e.g. <0.09>
+## w: Argument of periastron (degrees). e.g. <80>
+## THIS FILE CAN BE USED AS A LOCAL DATABSE OR CATALOGUE FOR EPHEMERIS TESTING.
+
+tic_id pl_name t_zero period aRs k b e w
+4598935 test1 2459972.631689 24.7104662 38.1 0.0594 0 0 0
+309792357 test1 2458256.1286 104.854 75.016 0.101 0.45 0.09 350
+309792357 test2 2460038.977062 104.8729635 75.016 0.101 0.45 0.09 350
+

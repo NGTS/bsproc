@@ -13,7 +13,7 @@ import argparse as ap
 import BSP_utils as bspu
 import BSP_db as bspd
 import BSP_phot as bspp
-from bmlc_nea import tranmodel, forcemodel, collect_model
+from bmlc_nea import tranmodel, forcemodel, filemodel, collect_model
 from  BSP_bmlc_obs import moplot
 
 def ParseArgs():
@@ -137,8 +137,8 @@ if __name__ == "__main__":
         model_files = forcemodel(actionlist, obj_ticid, observation_nights, night_outdir_dict, logger_main)
 
       elif args.model == 'file':
-        logger_main.info("[BMLC] Model source set to 'file'. Functionality not yet implemented.")
-        model_files = {} # TBC
+        logger_main.info("[BMLC] Generating transit model from ephemeris wrote in ephem_file.dat...")
+        model_files = filemodel(actionlist, obj_ticid, observation_nights, night_outdir_dict, logger_main)
 
     else:
       logger_main.info("[BMLC] --model not set, skipping transit model generation.")
