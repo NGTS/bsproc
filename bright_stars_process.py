@@ -62,7 +62,9 @@ def ParseArgs():
     parser.add_argument('--plot_only',choices=['nea', 'ephem', 'file'],
                         help= 'If set, only plot the model and observations from the specified source. Model and observation light curves must already exist.')
     parser.add_argument('--model',choices=['nea', 'ephem', 'file'],
-                        help='Create transit model, and plot the model with obs. OPTIONAL. If used must also provide model source:"nea", "ephem", "file"')         
+                        help='Create transit model, and plot the model with obs. OPTIONAL. If used must also provide model source:"nea", "ephem", "file"')
+    parser.add_argument('--model_path', type=str, default=None,
+                        help='Name of directory of the ephemeris file. REQUIRED if --model file or --plot_only file used')         
     return parser.parse_args()
 
 if __name__ == "__main__":
@@ -125,8 +127,14 @@ if __name__ == "__main__":
     #      HardCoded values for other names - ToDo: implement Sam's SIMBAD querying    
     # logger_main, obj_ticid = bspd.get_target_tic_id(logger_main, object_name)
     obj_ticid = args.tic_id
+    
     model_files = {}
     # If set --model, the source will be used to search parameters for creating Batman transit model.
+    filepath = args.model_path
+    if (args.model == 'file' or args.plot_only == 'file') and filepath is None:
+      logger_main.error("--model_path is REQUIRED when using source='file' in --model or --plot_only.")
+      sys.exit(1)
+
     if args.model:
       if args.model == 'nea':
         logger_main.info("[BMLC] Generating transit model from NEA parameters...")
@@ -135,18 +143,21 @@ if __name__ == "__main__":
       elif args.model == 'ephem':
         logger_main.info("[BMLC] Generating transit model from ephemeris parameters...")
         model_files = forcemodel(actionlist, obj_ticid, observation_nights, night_outdir_dict, logger_main)
-
+      
       elif args.model == 'file':
-        logger_main.info("[BMLC] Generating transit model from ephemeris wrote in ephem_file.dat...")
-        model_files = filemodel(actionlist, obj_ticid, observation_nights, night_outdir_dict, logger_main)
+        logger_main.info(f"[BMLC] Generating transit model from ephemeris wrote in {filepath}...")
+        model_files = filemodel(actionlist, obj_ticid, observation_nights, night_outdir_dict, filepath, logger_main)
 
     else:
       logger_main.info("[BMLC] --model not set, skipping transit model generation.")
 
     if args.plot_only:
-      model_files = collect_model(actionlist, obj_ticid, observation_nights, night_outdir_dict, source=args.plot_only, logger=logger_main)
-      moplot(logger_main, night_outdir_dict, obj_ticid, observation_nights, model_files)
-      sys.exit(0)
+      model_files = collect_model(actionlist, obj_ticid, observation_nights, night_outdir_dict, filepath, source=args.plot_only, logger=logger_main)
+      if model_files:
+        moplot(logger_main, night_outdir_dict, obj_ticid, observation_nights, model_files)
+        sys.exit(0)
+      else:
+        sys.exit(1)
 
     # This function call runs the main BSP process.
     # This process includes - 
@@ -173,8 +184,11 @@ if __name__ == "__main__":
         observation_nights, object_name, obj_ticid, args, outdir_main
         )
 
-    if model_files:
+    if not model_files:
+       logger_main.warning(f"No model light curve files found for TIC {obj_ticid}. Plot skipped.")
+    else:
         moplot(logger_main, night_outdir_dict, obj_ticid, observation_nights, model_files)
+    
         
       
   

@@ -292,9 +292,9 @@ def forcemodel(actionlist, ticid, nights, night_outdir_dict, logger= None):
 
     return model_files
 
-def filemodel(actionlist, ticid, nights, night_outdir_dict, logger= None):
+def filemodel(actionlist, ticid, nights, night_outdir_dict, filepath, logger= None):
     #1. call query and prepare parameters for Batman
-    df = QNEA.get_ephem_from_files(ticid)
+    df = QNEA.get_ephem_from_files(ticid, filepath)
     if df is None or len(df) == 0:
         logger.error(f"No parameters found in ephem_file for TIC {ticid}")
         return None
@@ -337,7 +337,7 @@ def filemodel(actionlist, ticid, nights, night_outdir_dict, logger= None):
     return model_files
 
 
-def collect_model(actionlist, ticid, nights, night_outdir_dict, source=None, logger=None):
+def collect_model(actionlist, ticid, nights, night_outdir_dict, filepath, source=None, logger=None):
     """
     Collect or generate model files for plotting.
     For now, only 'nea' and 'ephem' sources are supported.
@@ -355,7 +355,7 @@ def collect_model(actionlist, ticid, nights, night_outdir_dict, source=None, log
     elif source == 'file':
         if logger:
             logger.warning(f"[PLOT] Collecting model files from ephem_file.dat for TIC {ticid}")
-        model_files = filemodel(actionlist, ticid, nights, night_outdir_dict, logger)
+        model_files = filemodel(actionlist, ticid, nights, night_outdir_dict, filepath, logger)
     
     else:
         if logger:

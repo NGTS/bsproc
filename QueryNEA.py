@@ -547,7 +547,7 @@ def get_ephem_from_tess_portal(tic_id):
         'pl_name': "pl_name",
         't_zero': 'pl_tranmid',
         'period': 'pl_orbper',
-        'radius_1': 'ratdor',
+        'radius_1': 'pl_ratdor',
         'k': 'pl_ratror',
         'b': 'pl_imppar',
         'e': 'pl_orbeccen',
@@ -562,8 +562,8 @@ def get_ephem_from_tess_portal(tic_id):
     return df
 
 
-def get_ephem_from_files(tic_id):
-    file_path = "ephem_file.dat"
+def get_ephem_from_files(tic_id, filepath):
+    file_path = filepath
     df_all = pd.read_csv(file_path, delim_whitespace=True, comment='#')
     try:
         df = df_all[df_all['tic_id'] == tic_id]
@@ -579,7 +579,7 @@ def get_ephem_from_files(tic_id):
         'pl_name': "pl_name",
         't_zero': 'pl_tranmid',
         'period': 'pl_orbper',
-        'aRs': 'ratdor',
+        'aRs': 'pl_ratdor',
         'k': 'pl_ratror',
         'b': 'pl_imppar',
         'e': 'pl_orbeccen',
