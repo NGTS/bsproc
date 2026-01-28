@@ -520,7 +520,7 @@ def query_params_NEA(ticid):
 def get_ephem_from_tess_portal(tic_id):
 
     qry = """
-    SELECT tic_id, t_zero, period, radius_1, k, b, e, w
+    SELECT tic_id, pl_name, t_zero, period, radius_1, k, b, e, w
     FROM tess_portal.ephem
     WHERE tic_id = %s
     """
@@ -541,20 +541,20 @@ def get_ephem_from_tess_portal(tic_id):
         return pd.DataFrame()
 
     df = pd.DataFrame(rows)
-
+    df['radius_1'] = 1.0 / df['radius_1']
     df = df.rename(columns={
         'tic_id': 'tic_id',
+        'pl_name': "pl_name",
         't_zero': 'pl_tranmid',
         'period': 'pl_orbper',
-        'radius_1': 'pl_ratdor',
+        'radius_1': 'ratdor',
         'k': 'pl_ratror',
         'b': 'pl_imppar',
         'e': 'pl_orbeccen',
         'w': 'omega'
     })
 
-    df.insert(0, 'pl_name',  'TIC ' + df['tic_id'].astype(str))
-    df.insert(1, 'hostname', 'TIC ' + df['tic_id'].astype(str))
+    df.insert(0, 'hostname', 'TIC ' + df['tic_id'].astype(str))
     print(f"Returning parameters found in TESS_portal.ephems for TIC {tic_id}: ")
     print("----------------------------------------------------------------------------------------")
     print(df)

@@ -144,7 +144,7 @@ if __name__ == "__main__":
       logger_main.info("[BMLC] --model not set, skipping transit model generation.")
 
     if args.plot_only:
-      model_files = collect_model(actionlist, obj_ticid, observation_nights, night_outdir_dict, source=args.plot_only, logger = logger_main)
+      model_files = collect_model(actionlist, obj_ticid, observation_nights, night_outdir_dict, source=args.plot_only, logger=logger_main)
       moplot(logger_main, night_outdir_dict, obj_ticid, observation_nights, model_files)
       sys.exit(0)
 

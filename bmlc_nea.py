@@ -271,7 +271,7 @@ def forcemodel(actionlist, ticid, nights, night_outdir_dict, logger= None):
             logger.info(f"For planet {pl_name}, For actions: {actions_onen} ----Start BJD: {t_start}, End BJD: {t_end}")
 
             # 4. batman prediction
-            bjd, flux, tc, T1, T4 = predict_transit_curve(row, t_start, t_end)
+            bjd, flux, tc, T1, T4 = predict_transit_curve(row, t_start, t_end, logger)
 
             # 5. save output  
             model_dir = os.path.join(outdir, "models", pl_name)
