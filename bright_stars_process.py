@@ -116,6 +116,7 @@ if __name__ == "__main__":
       exit(-1)
 
     actions = actionlist['action_id'].to_numpy()
+    cameras = actionlist['camera_id'].to_numpy()
     night_store = actionlist['night'].to_numpy()
     night_outdir_dict = { n:d for n,d in zip(observation_nights, individual_night_outdirs) }
     individual_night_outdir_store = np.array([ night_outdir_dict[n] for n in night_store ])
@@ -180,7 +181,7 @@ if __name__ == "__main__":
     # This collected light curve data is then saved as a .dat text file and plotted
     bspp.collect_best_aperture_photometry(
         logger_main, ac_apers_min_target_store, ac_apers_min_master_store,
-        missing_action_store, output_file_name_store, actions, night_store,
+        missing_action_store, output_file_name_store, actions, cameras, night_store,
         observation_nights, object_name, obj_ticid, args, outdir_main
         )
 

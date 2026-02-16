@@ -1034,8 +1034,8 @@ def run_BSP_process(logger_main, cmd_args, object_name, ngpipe_op_dir, action_id
             missing_action_store, output_file_name_store
 
 def collect_best_aperture_photometry(logger_main, ac_apers_min_target, ac_apers_min_master,
-                                     missing_actions, output_file_names, action_ids, obs_night_store,
-                                     obs_nights, obj_name, target_tic, cmd_args, outdir):
+                                     missing_actions, output_file_names, action_ids, action_cams,
+                                     obs_night_store, obs_nights, obj_name, target_tic, cmd_args, outdir):
     """
     This function collects the 'best' LCs based on the BSP pipeline results
     These 'best' LCs are plotted and saved as .dat text files
@@ -1054,6 +1054,8 @@ def collect_best_aperture_photometry(logger_main, ac_apers_min_target, ac_apers_
         List storing the file names and paths for the data outputs for each action.
     action_ids : array; int
         All NGTS action IDs considered in this BSP pipeline run.
+    action_cams : array; int
+        Camera IDs associated with each action in `action_ids`.
     obs_night_store : array; str
         NGTS observation nights for each action.
     obs_nights : list; str
@@ -1072,6 +1074,8 @@ def collect_best_aperture_photometry(logger_main, ac_apers_min_target, ac_apers_
     None.
 
     """
+    act_cam_map = {a:c for a,c in zip(action_ids, action_cams)}
+  
     action_store = np.array([], dtype=int)
     airmass_store = np.array([])
     fwhm_sep, fwhm_tl, fwhm_rgw = np.array([]), np.array([]), np.array([])
@@ -1105,13 +1109,14 @@ def collect_best_aperture_photometry(logger_main, ac_apers_min_target, ac_apers_
         err0_mc = np.append(err0_mc, np.array(dat.loc[:, f'FluxErrA{rc}']))
         skybg_t = np.append(skybg_t, np.array(dat.loc[:, f'SkyBgA{rt}']))
         skybg_mc = np.append(skybg_mc, np.array(dat.loc[:, f'SkyBgA{rc}']))
-        
-        
-    opt  = np.column_stack((action_store, bjd, airmass_store,
+    
+    camera_store = np.array([ act_cam_map[a] for a in action_store ], dtype=int)
+    
+    opt  = np.column_stack((action_store, camera_store, bjd, airmass_store,
                             flux_t, err_t,
                             flux0_t, err0_t, skybg_t,
                             fwhm_sep, fwhm_tl, fwhm_rgw))
-    opmc = np.column_stack((action_store, bjd, airmass_store,
+    opmc = np.column_stack((action_store, camera_store, bjd, airmass_store,
                             flux_mc, err_mc,
                             flux0_mc, err0_mc, skybg_mc,
                             fwhm_sep, fwhm_tl, fwhm_rgw))
@@ -1134,22 +1139,22 @@ def collect_best_aperture_photometry(logger_main, ac_apers_min_target, ac_apers_
               f'\n Actions: {action_ids[ac_map]}' + \
               f'\n Aperture Radii: {ac_apers_min_target} pixels' + \
                '\n Note these apertures minimise the target flux RMS' + \
-               '\n ActionID   BJD   Airmass   FluxNorm   FluxNormErr   Flux   FluxErr  SkyBg   FWHM_SEP   FWHM_TL   FWHM_RGW'
+               '\n ActionID   CameraID   BJD   Airmass   FluxNorm   FluxNormErr   Flux   FluxErr  SkyBg   FWHM_SEP   FWHM_TL   FWHM_RGW'
     
     headermc =  ' Object: '+obj_name+f'  (TIC-{target_tic})       '+camstr + \
                 '\n Night(s): '+ns1 + \
                f'\n Actions: {action_ids[ac_map]}' + \
                f'\n Aperture Radii: {ac_apers_min_master} pixels' + \
                 '\n Note these apertures minimise the master comparison flux RMS' + \
-                '\n ActionID   BJD   Airmass   FluxNorm   FluxNormErr   Flux   FluxErr  SkyBg   FWHM_SEP   FWHM_TL   FWHM_RGW'
+                '\n ActionID   CameraID   BJD   Airmass   FluxNorm   FluxNormErr   Flux   FluxErr  SkyBg   FWHM_SEP   FWHM_TL   FWHM_RGW'
                 
     np.savetxt(outdir+'/'+obj_name+'_NGTS'+ns2+camstr+'_target_apers_bsproc_lc.dat',
                opt, header=headert,
-               fmt='%i %.8f %.6f %.8f %.8f %.8f %.8f %.3f %.4f %.4f %.4f', delimiter=' ')
+               fmt='%i %i %.8f %.6f %.8f %.8f %.8f %.8f %.3f %.4f %.4f %.4f', delimiter=' ')
     
     np.savetxt(outdir+'/'+obj_name+'_NGTS'+ns2+camstr+'_master_apers_bsproc_lc.dat',
                opmc, header=headermc,
-               fmt='%i %.8f %.6f %.8f %.8f %.8f %.8f %.3f %.4f %.4f %.4f', delimiter=' ')
+               fmt='%i %i %.8f %.6f %.8f %.8f %.8f %.8f %.3f %.4f %.4f %.4f', delimiter=' ')
     
     # We also produce a plot of the 'best' median normalised differential flux
     #  target light curve. This plot is displayed to the screen at the end of 
