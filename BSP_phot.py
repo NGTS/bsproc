@@ -1159,7 +1159,7 @@ def collect_best_aperture_photometry(logger_main, ac_apers_min_target, ac_apers_
     # We also produce a plot of the 'best' median normalised differential flux
     #  target light curve. This plot is displayed to the screen at the end of 
     #  the BSP pipeline run
-    t0 = np.int(bjd[0])
+    t0 = int(bjd[0])
     tbin_t, fbin_t, ebin_t = bspu.lb(bjd, flux_t, err_t, 5/1440.)
     tbin_mc, fbin_mc, ebin_mc = bspu.lb(bjd, flux_mc, err_mc, 5/1440.)
     fig, ax2 = plt.subplots(1, 1, figsize=(8, 6))

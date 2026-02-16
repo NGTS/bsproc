@@ -767,17 +767,17 @@ if __name__ == "__main__":
     opdir_root = '/'.join(args.file_name.split('/')[:-1])+'/fit_outputs/'
     start, end = args.start, args.end
     bjd0 = np.copy(lc[:, 1])
-    bjd0 -= np.int(bjd0[0])
+    bjd0 -= int(bjd0[0])
     keep = (bjd0 >= start) & (bjd0 <= end)
     bjd, sap, err = np.copy(lc[keep, 1]), np.copy(lc[keep, 3]), np.copy(lc[keep, 4])
     if args.detrend == 'airmass':
         detrend = np.copy(lc[keep, 2])
         quaddt = False
     elif args.detrend == 'time':
-        detrend = np.copy(bjd) - np.int(bjd.min())
+        detrend = np.copy(bjd) - int(bjd.min())
         quaddt = False
     elif args.detrend == 'quad':
-        detrend = np.copy(bjd) - np.int(bjd.min())
+        detrend = np.copy(bjd) - int(bjd.min())
         quaddt = True
     actions = np.copy(lc[keep, 0])
     aids = np.unique(actions)
