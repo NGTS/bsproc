@@ -355,7 +355,7 @@ def query_params_from_toi(ticid):
         "st_tmag, st_rad, st_logg "
         #"SELECT TOP 5 * "
         "FROM toi "
-        f"WHERE tid = {ticid} AND tran_flag=1" 
+        f"WHERE tid = {ticid}" 
     )
     params = {
         "query": qry,
