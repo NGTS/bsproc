@@ -18,7 +18,7 @@ from scipy.interpolate import InterpolatedUnivariateSpline as ius
 import BSP_utils as bspu
 import BSP_db as bspd
 
-def calc_noise(r_aper, exptime, dc_pp_ps, scint, lc, gain=2.):
+def calc_noise(r_aper, exptime, dc_pp_ps, scint, f_target, f_sky, gain=2.):
     """
     Work out the additonal noise sources for the error bars
     
@@ -32,8 +32,10 @@ def calc_noise(r_aper, exptime, dc_pp_ps, scint, lc, gain=2.):
         Dark current per pixel per second
     scint : array; float
         The estimated scintillation noise
-    lc : array-like
-        The photometry containing star + sky light
+    f_target : array-like
+        The flux counts from the target star
+    f_sky : array-like
+        The flux counts from the sky background
     Returns
     -------
     lc_err_new : array-like
@@ -42,10 +44,10 @@ def calc_noise(r_aper, exptime, dc_pp_ps, scint, lc, gain=2.):
     ------
     None
     """
-    read_noise = 14.0
+    read_noise = 14.0 / gain
     npix = np.pi*r_aper**2
     dark_current = dc_pp_ps*npix*exptime
-    lc_err_new = np.sqrt(lc/gain + dark_current + npix*read_noise**2 + (scint*lc)**2)
+    lc_err_new = np.sqrt((f_target + f_sky)/gain + dark_current + npix*read_noise**2 + (scint*f_target)**2)
     return lc_err_new
 
 def estimate_scintillation_noise(airmass, exptime):
@@ -656,12 +658,12 @@ def compute_differential_phot_lc(logger, cmd_args, obj_name, obs_night, phot_df,
     logger.info(f'Action{ac_id}; A{aper_rad} - master comp rms: {np.std(master_comp / airmass_mc_mod)*100:.3f} %')
     # Calculate the photometric uncertainty of the comparison stars
     # These errors are summed in quadrature to estimate the master comparison photometric uncertainty
-    comp_errs = np.vstack(([calc_noise(aper_rad, 10, 1.0, target_scint_noise, cfi+csi)
+    comp_errs = np.vstack(([calc_noise(aper_rad, 10, 1.0, target_scint_noise, cfi, csi)
                             for cfi, csi in zip(comp_fluxes, comp_skys)]))
     master_comp_err = np.sqrt(np.sum(comp_errs**2, axis=0))
     # lightcurve is the differential flux time series
     lightcurve = target_flux / master_comp
-    target_err = calc_noise(aper_rad, 10, 1.0, target_scint_noise, target_flux+target_sky)
+    target_err = calc_noise(aper_rad, 10, 1.0, target_scint_noise, target_flux, target_sky)
     err_factor = np.sqrt((target_err/target_flux)**2 + (master_comp_err/master_comp)**2)
     # lightcurve_err is the differential flux error time series
     lightcurve_err = lightcurve * err_factor
