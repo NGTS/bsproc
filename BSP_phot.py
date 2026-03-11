@@ -107,16 +107,20 @@ def find_comp_star_rms(comp_fluxes, airmass, comp_mags0):
         #  linear model against airmass
         # This should remove the majority of the dominant red noise trends
         comp_flux = np.copy(comp_fluxes[i])
-        airmass_cs = np.polyfit(airmass, comp_flux, 1)
-        airmass_mod = np.polyval(airmass_cs, airmass)
-        comp_flux_corrected = comp_flux / airmass_mod
-        comp_flux_norm = comp_flux_corrected / np.median(comp_flux_corrected)
-        # We then compute the flux RMS of the detrended comparison star flux
-        comp_star_rms_val = np.std(comp_flux_norm)
-        if np.isfinite(comp_star_rms_val):
-            comp_star_rms = np.append(comp_star_rms, comp_star_rms_val)
+        # check if greater than 80% flux values set to zero or negative
+        if np.sum(comp_flux <= 0) >= 0.8 * len(comp_flux):
+            comp_star_rms = np.append(comp_star_rms, -99)
         else:
-            comp_star_rms = np.append(comp_star_rms, 99.)
+            airmass_cs = np.polyfit(airmass, comp_flux, 1)
+            airmass_mod = np.polyval(airmass_cs, airmass)
+            comp_flux_corrected = comp_flux / airmass_mod
+            comp_flux_norm = comp_flux_corrected / np.median(comp_flux_corrected)
+            # We then compute the flux RMS of the detrended comparison star flux
+            comp_star_rms_val = np.std(comp_flux_norm)
+            if np.isfinite(comp_star_rms_val):
+                comp_star_rms = np.append(comp_star_rms, comp_star_rms_val)
+            else:
+                comp_star_rms = np.append(comp_star_rms, -99.)
     return comp_star_rms
 
 def find_bad_comp_stars(logger, comp_fluxes, airmass, comp_mags0,
@@ -153,7 +157,9 @@ def find_bad_comp_stars(logger, comp_fluxes, airmass, comp_mags0,
     """
     # Determine the flux RMS for each comparison star
     comp_star_rms = find_comp_star_rms(comp_fluxes, airmass, comp_mags0)
-    comp_star_mask = np.array([True for cs in comp_star_rms])
+    # Initial mask set to zero if rms has negative value (these are comp stars with all zero/negative
+    #     fluxes or non finite RMS values
+    comp_star_mask = np.array([True if cs >= 0. else False for cs in comp_star_rms])
     i = 0.
     while True:
         # We iteratively fit a spline to the comp star mag vs RMS distribution
@@ -181,7 +187,7 @@ def find_bad_comp_stars(logger, comp_fluxes, airmass, comp_mags0,
         mod = spl(comp_mags)
         mod0 = spl(comp_mags0)
         std = np.std(comp_rms - mod)
-        comp_star_mask = (comp_star_rms <= mod0 + std * sig_level)
+        comp_star_mask = (comp_star_rms <= mod0 + std * sig_level) & (comp_star_rms >= 0.)
         N2 = np.sum(comp_star_mask)
         # If no more comp stars are removed or we hit 10 iterations we break
         if N1 == N2:
@@ -535,9 +541,11 @@ def make_comp_star_plots(comp_tmags, comp_rms_vals, comp_inds, comp_tics,
             c='black'
         else:
             c='red'
-        plt.gca().annotate(int(j),
-                           (comp_tmags[i]+0.01, 100 * comp_rms_vals[i]+0.01),
-                           color=c)
+        # check for bad comp stars with rms values set to negative placeholders
+        if comp_rms_vals[i] > 0.:
+            plt.gca().annotate(int(j),
+                               (comp_tmags[i]+0.01, 100 * comp_rms_vals[i]+0.01),
+                               color=c)
     plt.xlabel('Tmag')
     plt.ylabel('RMS (% per exposure)')
     plt.title(obj_name+'   Night '+obs_night+f'   Action {ac_id}   Aper {aper_radius} pix')
